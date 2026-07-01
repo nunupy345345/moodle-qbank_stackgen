@@ -40,5 +40,18 @@ $string['status_rejected']               = 'Rejected';
 $string['status_validation_failed']      = 'CAS validation failed';
 $string['status_requires_manual_review'] = 'Requires manual review';
 
+// Job list.
+$string['job_list_heading']              = 'Recent processing history';
+$string['xml_generated']                 = 'STACK XML generated';
+$string['xml_show_raw']                  = 'Show XML';
+$string['ocr_question_text']             = 'Question text';
+$string['ocr_question_type']             = 'Question type';
+$string['ocr_problem_expression']        = 'Expression (LaTeX)';
+$string['ocr_answer_expression']         = 'Answer (LaTeX)';
+
+// Errors.
 $string['error_no_capability']           = 'You do not have permission to perform this action.';
 $string['error_invalid_courseid']        = 'Invalid course ID.';
+$string['error_ocr_api_key_missing']     = 'Google API key is not set. Please configure it in the admin settings.';
+$string['error_generic']                 = 'An error occurred.';
+$string['error_llm_api_key_missing']     = 'Google API key is not set. Please configure it in the admin settings.';

@@ -44,6 +44,18 @@ $string['status_rejected']               = '却下';
 $string['status_validation_failed']      = 'CAS検証失敗';
 $string['status_requires_manual_review'] = '手動レビュー要';
 
+// Job list.
+$string['job_list_heading']              = '最近の処理履歴';
+$string['xml_generated']                 = 'STACK XML 生成済み';
+$string['xml_show_raw']                  = 'XML を表示';
+$string['ocr_question_text']             = '問題文';
+$string['ocr_question_type']             = '問題タイプ';
+$string['ocr_problem_expression']        = '数式（LaTeX）';
+$string['ocr_answer_expression']         = '答え（LaTeX）';
+
 // Errors.
 $string['error_no_capability']           = 'この操作を実行する権限がありません。';
 $string['error_invalid_courseid']        = '無効なコースIDです。';
+$string['error_ocr_api_key_missing']     = 'Google API キーが設定されていません。管理画面で設定してください。';
+$string['error_generic']                 = 'エラーが発生しました。';
+$string['error_llm_api_key_missing']     = 'Google API キーが設定されていません。管理画面で設定してください。';
