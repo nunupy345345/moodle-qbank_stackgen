@@ -1,0 +1,44 @@
+<?php
+defined('MOODLE_INTERNAL') || die();
+
+$string['pluginname']                    = 'STACK question generator (from image)';
+$string['pluginname_desc']               = 'Automatically generates Moodle STACK questions from textbook images.';
+
+$string['generate_from_image']           = 'Generate from image';
+
+$string['upload_page_title']             = 'Generate question from image';
+$string['upload_instructions']           = 'Upload an image of a textbook or worksheet. The image will be preprocessed in your browser and the question will be generated automatically in the background.';
+$string['upload_label']                  = 'Select image file (JPEG / PNG / WebP, max 20MB)';
+$string['upload_preview_alt']            = 'Preview of uploaded image';
+$string['upload_submit']                 = 'Start generation';
+$string['upload_success']                = 'Image received. Processing in the background.';
+$string['upload_error_nofile']           = 'Please select an image file.';
+$string['upload_error_invalid']          = 'Invalid file format. Please select JPEG, PNG, or WebP.';
+$string['upload_processing']             = 'Processing in the background. Please wait.';
+
+$string['settings_api_heading']          = 'API settings';
+$string['settings_google_api_key']       = 'Google API key (Gemini)';
+$string['settings_google_api_key_desc']  = 'Google Cloud API key used for Gemini 1.5 Flash OCR.';
+$string['settings_llm_provider']         = 'LLM provider';
+$string['settings_llm_provider_desc']    = 'Select the LLM to use for STACK XML generation.';
+$string['settings_anthropic_api_key']    = 'Anthropic API key (Claude)';
+$string['settings_anthropic_api_key_desc'] = 'Required when using Claude.';
+$string['settings_openai_api_key']       = 'OpenAI API key';
+$string['settings_openai_api_key_desc']  = 'Required when using OpenAI (GPT-4o).';
+$string['settings_maxima_url']           = 'goemaxima URL';
+$string['settings_maxima_url_desc']      = 'URL of the goemaxima service (within the Docker network).';
+$string['settings_max_retry']            = 'Max CAS validation retries';
+$string['settings_max_retry_desc']       = 'Maximum number of LLM re-generation attempts on CAS validation failure.';
+
+$string['status_pending']                = 'Pending';
+$string['status_ocr_done']               = 'OCR complete';
+$string['status_llm_done']               = 'XML generation complete';
+$string['status_validated']              = 'CAS validation OK';
+$string['status_review_pending']         = 'Awaiting review';
+$string['status_approved']               = 'Approved';
+$string['status_rejected']               = 'Rejected';
+$string['status_validation_failed']      = 'CAS validation failed';
+$string['status_requires_manual_review'] = 'Requires manual review';
+
+$string['error_no_capability']           = 'You do not have permission to perform this action.';
+$string['error_invalid_courseid']        = 'Invalid course ID.';

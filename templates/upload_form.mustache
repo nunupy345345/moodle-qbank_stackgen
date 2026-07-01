@@ -1,0 +1,39 @@
+{{!
+    Template: qbank_stackgen/upload_form
+    Context variables:
+      - actionurl: form action URL
+      - sesskey:   Moodle session key
+      - courseid:  course id
+      - formid:    HTML id of the form element
+}}
+<div class="qbank-stackgen-upload">
+    <h2>{{# str }} upload_page_title, qbank_stackgen {{/ str }}</h2>
+    <p class="text-muted">{{# str }} upload_instructions, qbank_stackgen {{/ str }}</p>
+
+    <form id="{{formid}}" method="post" action="{{actionurl}}" enctype="multipart/form-data">
+        <input type="hidden" name="sesskey"  value="{{sesskey}}">
+        <input type="hidden" name="courseid" value="{{courseid}}">
+        <input type="hidden" name="image_b64" value="">
+
+        <div class="form-group mb-3">
+            <label for="stackgen-file-input" class="form-label">
+                {{# str }} upload_label, qbank_stackgen {{/ str }}
+            </label>
+            <input type="file"
+                   id="stackgen-file-input"
+                   name="imagefile"
+                   class="form-control"
+                   accept="image/jpeg,image/png,image/webp,image/heic">
+        </div>
+
+        <div class="mb-3">
+            <img class="stackgen-preview img-thumbnail"
+                 alt="{{# str }} upload_preview_alt, qbank_stackgen {{/ str }}"
+                 style="display:none; max-width:100%; max-height:400px;">
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            {{# str }} upload_submit, qbank_stackgen {{/ str }}
+        </button>
+    </form>
+</div>

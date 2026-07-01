@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="question/bank/stackgen/db" VERSION="20260610" COMMENT="XMLDB file for qbank_stackgen"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd">
+  <TABLES>
+    <TABLE NAME="qbank_stackgen_jobs" COMMENT="STACK問題生成ジョブ管理">
+      <FIELDS>
+        <FIELD NAME="id"           TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid"     TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="userid"       TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="status"       TYPE="char" LENGTH="30" NOTNULL="true" DEFAULT="pending"/>
+        <FIELD NAME="image_b64"    TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="ocr_result"   TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="xml_result"   TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="error_msg"    TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="retry_count"  TYPE="int"  LENGTH="2"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timecreated"  TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="timemodified" TYPE="int"  LENGTH="10" NOTNULL="true"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary"  TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="userid"   TYPE="foreign" FIELDS="userid"   REFTABLE="user"   REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="status_idx" UNIQUE="false" FIELDS="status"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>
