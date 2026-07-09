@@ -32,6 +32,7 @@ $string['settings_max_retry_desc']       = 'Maximum number of LLM re-generation 
 
 $string['status_pending']                = 'Pending';
 $string['status_ocr_done']               = 'OCR complete';
+$string['status_feedback_pending']       = 'Awaiting feedback review';
 $string['status_llm_done']               = 'XML generation complete';
 $string['status_validated']              = 'CAS validation OK';
 $string['status_review_pending']         = 'Awaiting review';
@@ -39,6 +40,7 @@ $string['status_approved']               = 'Approved';
 $string['status_rejected']               = 'Rejected';
 $string['status_validation_failed']      = 'CAS validation failed';
 $string['status_requires_manual_review'] = 'Requires manual review';
+$string['status_autoprocessing']         = 'Processing automatically...';
 
 // Job list.
 $string['job_list_heading']              = 'Recent processing history';
@@ -48,6 +50,28 @@ $string['ocr_question_text']             = 'Question text';
 $string['ocr_question_type']             = 'Question type';
 $string['ocr_problem_expression']        = 'Expression (LaTeX)';
 $string['ocr_answer_expression']         = 'Answer (LaTeX)';
+$string['retry_button']                  = 'Retry';
+$string['retry_count_label']             = 'Retry attempt {$a}';
+$string['retry_success']                 = 'Queued for retry. It will be processed automatically shortly.';
+$string['review_link']                   = 'Review wrong answers & feedback';
+
+// Review page (Stage 3).
+$string['review_page_title']             = 'Review wrong answers & feedback';
+$string['review_instructions']           = 'Review and edit the AI-generated wrong-answer examples and feedback below. Once confirmed, they will be used to generate the PRT (scoring logic) in the STACK XML.';
+$string['review_wronganswers_heading']   = 'Wrong-answer examples & feedback';
+$string['review_wa_expression']          = 'Wrong answer (Maxima expression)';
+$string['review_wa_misconception']       = 'Likely cause';
+$string['review_wa_feedback']            = 'Feedback text';
+$string['review_wa_add']                 = '+ Add wrong-answer example';
+$string['review_wa_remove']              = 'Remove';
+$string['review_confirm_button']         = 'Confirm and generate XML';
+$string['review_confirm_success']        = 'Confirmed. Generating STACK XML in the background.';
+$string['review_error_wrongstatus']      = 'This job is not currently awaiting feedback review.';
+$string['review_error_invalid']          = 'Invalid feedback data.';
+$string['review_awaiting_xml']           = 'Generating STACK XML in the background. Please wait.';
+$string['import_category_name']          = 'STACKGen Auto-generated';
+$string['import_success']                = 'Registered in the question bank.';
+$string['import_view_bank']              = 'View in question bank';
 
 // Errors.
 $string['error_no_capability']           = 'You do not have permission to perform this action.';

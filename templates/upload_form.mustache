@@ -44,66 +44,7 @@
 <div class="qbank-stackgen-jobs mt-4">
     <h3>{{# str }} job_list_heading, qbank_stackgen {{/ str }}</h3>
     {{# jobs }}
-    <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span class="font-weight-bold">ジョブ #{{id}}</span>
-            <span class="badge badge-{{statusclass}} px-2 py-1">{{statuslabel}}</span>
-            <small class="text-muted">{{timecreated}}</small>
-        </div>
-        {{# hasocr }}
-        <div class="card-body p-0">
-            {{# problems }}
-            <div class="border-top px-3 py-2">
-                <dl class="row mb-0 small">
-                    <dt class="col-sm-3">{{# str }} ocr_question_text, qbank_stackgen {{/ str }}</dt>
-                    <dd class="col-sm-9">{{question_text}}</dd>
-                    <dt class="col-sm-3">{{# str }} ocr_question_type, qbank_stackgen {{/ str }}</dt>
-                    <dd class="col-sm-9"><code>{{question_type}}</code></dd>
-                    <dt class="col-sm-3">{{# str }} ocr_problem_expression, qbank_stackgen {{/ str }}</dt>
-                    <dd class="col-sm-9">
-                        <code>{{problem_expression}}</code>
-                        <div class="mt-1">\( {{problem_expression}} \)</div>
-                    </dd>
-                    {{# has_answer }}
-                    <dt class="col-sm-3">{{# str }} ocr_answer_expression, qbank_stackgen {{/ str }}</dt>
-                    <dd class="col-sm-9">
-                        <code>{{answer_expression}}</code>
-                        <div class="mt-1">\( {{answer_expression}} \)</div>
-                    </dd>
-                    {{/ has_answer }}
-                </dl>
-            </div>
-            {{/ problems }}
-        </div>
-        {{/ hasocr }}
-        {{# hasxml }}
-        <div class="card-body border-top pt-2 pb-2">
-            <p class="mb-1 small font-weight-bold text-success">
-                {{# str }} xml_generated, qbank_stackgen {{/ str }}（{{xml_count}}問）
-            </p>
-            <ul class="mb-2 small pl-3">
-                {{# xml_questions }}
-                <li>{{qname}}</li>
-                {{/ xml_questions }}
-            </ul>
-            <details>
-                <summary class="small text-muted" style="cursor:pointer;">
-                    {{# str }} xml_show_raw, qbank_stackgen {{/ str }}
-                </summary>
-                <textarea class="form-control form-control-sm mt-1 text-monospace"
-                          rows="10" readonly
-                          style="font-size:0.75rem;">{{xml_raw}}</textarea>
-            </details>
-        </div>
-        {{/ hasxml }}
-        {{# haserror }}
-        <div class="card-body">
-            <div class="alert alert-danger mb-0 py-2">
-                <small>{{error_msg}}</small>
-            </div>
-        </div>
-        {{/ haserror }}
-    </div>
+    {{> qbank_stackgen/job_card }}
     {{/ jobs }}
 </div>
 {{/ hasjobs }}

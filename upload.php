@@ -26,6 +26,46 @@ $PAGE->set_heading($course->fullname);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_sesskey();
 
+    $action = optional_param('action', 'upload', PARAM_ALPHA);
+
+    if ($action === 'retry') {
+        $jobid = required_param('jobid', PARAM_INT);
+        $job = $DB->get_record('qbank_stackgen_jobs',
+            ['id' => $jobid, 'courseid' => $courseid, 'userid' => $USER->id], '*', MUST_EXIST);
+
+        // xml_result があれば llm_done から（Stage6の問題バンク登録だけ再実行）、
+        // feedback_confirmed があれば feedback_pending から（Stage4のみ再実行）、
+        // ocr_result のみあれば ocr_done から（Stage3からやり直し）、
+        // どちらもなければ pending から（OCRごとやり直し）。
+        if (!empty($job->xml_result)) {
+            $resumestatus = 'llm_done';
+        } else if (!empty($job->feedback_confirmed)) {
+            $resumestatus = 'feedback_pending';
+        } else if (!empty($job->ocr_result)) {
+            $resumestatus = 'ocr_done';
+        } else {
+            $resumestatus = 'pending';
+        }
+        $DB->update_record('qbank_stackgen_jobs', (object)[
+            'id'           => $jobid,
+            'status'       => $resumestatus,
+            'error_msg'    => null,
+            'retry_count'  => $job->retry_count + 1,
+            'timemodified' => time(),
+        ]);
+
+        $task = new \qbank_stackgen\task\generate_stack_question();
+        $task->set_custom_data(['jobid' => $jobid]);
+        \core\task\manager::queue_adhoc_task($task, true);
+
+        redirect(
+            new moodle_url('/question/bank/stackgen/upload.php', ['courseid' => $courseid]),
+            get_string('retry_success', 'qbank_stackgen'),
+            null,
+            \core\output\notification::NOTIFY_SUCCESS
+        );
+    }
+
     $image_b64 = optional_param('image_b64', '', PARAM_RAW);
 
     if (empty($image_b64)) {
@@ -64,96 +104,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Render upload form.
 $PAGE->requires->js_call_amd('qbank_stackgen/upload', 'init', ['stackgen-upload-form']);
+$PAGE->requires->js_call_amd('qbank_stackgen/job_review', 'init');
+$PAGE->requires->js_call_amd('qbank_stackgen/status_poll', 'init', [$courseid]);
 
 echo $OUTPUT->header();
 
 // Fetch recent jobs for this user in this course.
-$statusclasses = [
-    'pending'                => 'secondary',
-    'ocr_done'               => 'info',
-    'llm_done'               => 'primary',
-    'validated'              => 'success',
-    'review_pending'         => 'warning',
-    'approved'               => 'success',
-    'rejected'               => 'danger',
-    'validation_failed'      => 'danger',
-    'requires_manual_review' => 'danger',
-];
-$statuslabels = [
-    'pending'                => get_string('status_pending', 'qbank_stackgen'),
-    'ocr_done'               => get_string('status_ocr_done', 'qbank_stackgen'),
-    'llm_done'               => get_string('status_llm_done', 'qbank_stackgen'),
-    'validated'              => get_string('status_validated', 'qbank_stackgen'),
-    'review_pending'         => get_string('status_review_pending', 'qbank_stackgen'),
-    'approved'               => get_string('status_approved', 'qbank_stackgen'),
-    'rejected'               => get_string('status_rejected', 'qbank_stackgen'),
-    'validation_failed'      => get_string('status_validation_failed', 'qbank_stackgen'),
-    'requires_manual_review' => get_string('status_requires_manual_review', 'qbank_stackgen'),
-];
-
 $dbjobs = $DB->get_records_select(
     'qbank_stackgen_jobs',
     'courseid = ? AND userid = ?',
     [$courseid, $USER->id],
     'id DESC',
-    'id, status, ocr_result, xml_result, error_msg, timecreated',
+    'id, status, ocr_result, feedback_result, feedback_confirmed, xml_result, error_msg, ' .
+        'question_category_id, retry_count, timecreated',
     0, 10
 );
 
+$sesskey = sesskey();
 $jobs = [];
 foreach ($dbjobs as $job) {
-    $problems = [];
-    if (!empty($job->ocr_result)) {
-        $ocr = json_decode($job->ocr_result, true);
-        // 新形式: {"problems": [...]}、旧形式（単一問題）の後方互換も維持
-        $rawproblems = isset($ocr['problems']) ? $ocr['problems'] : [$ocr];
-        foreach ($rawproblems as $p) {
-            if (empty($p['problem_expression'])) {
-                continue;
-            }
-            $problems[] = [
-                'question_text'      => $p['question_text'] ?? '',
-                'question_type'      => $p['question_type'] ?? '',
-                'problem_expression' => $p['problem_expression'] ?? '',
-                'answer_expression'  => $p['answer_expression'] ?? null,
-                'has_answer'         => !empty($p['answer_expression']),
-            ];
-        }
-    }
-    // XML 結果をパースして問題名一覧を取得
-    $xml_questions = [];
-    if (!empty($job->xml_result)) {
-        $dom = new DOMDocument();
-        if (@$dom->loadXML($job->xml_result)) {
-            foreach ($dom->getElementsByTagName('question') as $q) {
-                $nameNodes = $q->getElementsByTagName('name');
-                $name = '';
-                if ($nameNodes->length > 0) {
-                    $textNodes = $nameNodes->item(0)->getElementsByTagName('text');
-                    if ($textNodes->length > 0) {
-                        $name = $textNodes->item(0)->textContent;
-                    }
-                }
-                $xml_questions[] = ['qname' => $name ?: '（名前なし）'];
-            }
-        }
-    }
-
-    $jobs[] = [
-        'id'            => $job->id,
-        'status'        => $job->status,
-        'statuslabel'   => $statuslabels[$job->status] ?? $job->status,
-        'statusclass'   => $statusclasses[$job->status] ?? 'secondary',
-        'timecreated'   => userdate($job->timecreated, get_string('strftimedatetimeshort', 'langconfig')),
-        'hasocr'        => !empty($problems),
-        'problems'      => $problems,
-        'hasxml'        => !empty($xml_questions),
-        'xml_questions' => $xml_questions,
-        'xml_count'     => count($xml_questions),
-        'xml_raw'       => $job->xml_result ?? '',
-        'haserror'      => !empty($job->error_msg),
-        'error_msg'     => $job->error_msg ?? '',
-    ];
+    $jobs[] = \qbank_stackgen\local\job_view::build($job, $courseid, $sesskey);
 }
 
 // Trigger MathJax re-typeset after DOM is ready.

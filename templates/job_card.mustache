@@ -1,0 +1,217 @@
+{{!
+    Template: qbank_stackgen/job_card
+
+    1ジョブ分のカード。qbank_stackgen\local\job_view::build() が返す配列と1:1で対応する。
+    upload_form.mustache のジョブ一覧ループから、このテンプレートをパーシャルとして呼び出すほか、
+    amd/src/status_poll.js から Templates.renderForPromise() 経由で単独レンダリングもされるため、
+    親テンプレートのコンテキストへのバブリングには依存しない（sesskey/courseid/actionurl も
+    このテンプレート自身のコンテキストに含まれている前提）。
+
+    Context variables:
+      - id, status, statuslabel, statusclass, timecreated
+      - hasocr, problems[]
+      - hasxml, xml_questions[], xml_count, xml_raw
+      - haserror, error_msg
+      - canretry, retry_count
+      - canreview, reviewproblems[], hasreviewproblems
+      - awaitingxml, autoprocessing, polling
+      - isapproved, bankurl
+      - confirmurl, sesskey, courseid, actionurl
+}}
+<div class="card mb-3" data-jobid="{{id}}" data-status="{{status}}"{{# polling }} data-polling="1"{{/ polling }}>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="font-weight-bold">ジョブ #{{id}}</span>
+        <span class="d-flex align-items-center">
+            <span class="badge badge-{{statusclass}} px-2 py-1">{{statuslabel}}</span>
+            {{# autoprocessing }}
+            <span class="spinner-border spinner-border-sm text-secondary ml-2" role="status" aria-hidden="true"></span>
+            <small class="text-muted ml-1">{{# str }} status_autoprocessing, qbank_stackgen {{/ str }}</small>
+            {{/ autoprocessing }}
+        </span>
+        <small class="text-muted">{{timecreated}}</small>
+    </div>
+    {{# hasocr }}
+    <div class="card-body p-0">
+        {{# problems }}
+        <div class="border-top px-3 py-2">
+            <dl class="row mb-0 small">
+                <dt class="col-sm-3">{{# str }} ocr_question_text, qbank_stackgen {{/ str }}</dt>
+                <dd class="col-sm-9">{{question_text}}</dd>
+                <dt class="col-sm-3">{{# str }} ocr_question_type, qbank_stackgen {{/ str }}</dt>
+                <dd class="col-sm-9"><code>{{question_type}}</code></dd>
+                <dt class="col-sm-3">{{# str }} ocr_problem_expression, qbank_stackgen {{/ str }}</dt>
+                <dd class="col-sm-9">
+                    <code>{{problem_expression}}</code>
+                    <div class="mt-1">\( {{problem_expression}} \)</div>
+                </dd>
+                {{# has_answer }}
+                <dt class="col-sm-3">{{# str }} ocr_answer_expression, qbank_stackgen {{/ str }}</dt>
+                <dd class="col-sm-9">
+                    <code>{{answer_expression}}</code>
+                    <div class="mt-1">\( {{answer_expression}} \)</div>
+                </dd>
+                {{/ has_answer }}
+            </dl>
+        </div>
+        {{/ problems }}
+    </div>
+    {{/ hasocr }}
+    {{# hasxml }}
+    <div class="card-body border-top pt-2 pb-2">
+        <p class="mb-1 small font-weight-bold text-success">
+            {{# str }} xml_generated, qbank_stackgen {{/ str }}（{{xml_count}}問）
+        </p>
+        <ul class="mb-2 small pl-3">
+            {{# xml_questions }}
+            <li>{{qname}}</li>
+            {{/ xml_questions }}
+        </ul>
+        <details>
+            <summary class="small text-muted" style="cursor:pointer;">
+                {{# str }} xml_show_raw, qbank_stackgen {{/ str }}
+            </summary>
+            <textarea class="form-control form-control-sm mt-1 text-monospace"
+                      rows="10" readonly
+                      style="font-size:0.75rem;">{{xml_raw}}</textarea>
+        </details>
+    </div>
+    {{/ hasxml }}
+    {{# isapproved }}
+    <div class="card-body border-top pt-2 pb-2">
+        <p class="mb-1 small font-weight-bold text-success">
+            {{# str }} import_success, qbank_stackgen {{/ str }}
+        </p>
+        <a href="{{bankurl}}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+            {{# str }} import_view_bank, qbank_stackgen {{/ str }}
+        </a>
+    </div>
+    {{/ isapproved }}
+    {{# haserror }}
+    <div class="card-body">
+        <div class="alert alert-danger mb-0 py-2">
+            <small>{{error_msg}}</small>
+        </div>
+    </div>
+    {{/ haserror }}
+    {{# awaitingxml }}
+    <div class="card-body border-top pt-2 pb-2">
+        <button type="button" class="btn btn-sm btn-secondary stackgen-review-toggle" disabled>
+            <span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
+            {{# str }} review_link, qbank_stackgen {{/ str }}
+        </button>
+        <small class="text-muted ml-2">{{# str }} review_awaiting_xml, qbank_stackgen {{/ str }}</small>
+    </div>
+    {{/ awaitingxml }}
+    {{# canreview }}
+    <div class="card-body border-top pt-2 pb-2">
+        <button type="button" class="btn btn-sm btn-warning stackgen-review-toggle" data-jobid="{{id}}"
+                data-awaiting-label="{{# str }} review_awaiting_xml, qbank_stackgen {{/ str }}">
+            {{# str }} review_link, qbank_stackgen {{/ str }}
+        </button>
+
+        {{# hasreviewproblems }}
+        <div class="stackgen-review-panel mt-3" data-jobid="{{id}}" style="display:none;">
+            <input type="hidden" class="stackgen-review-sesskey" value="{{sesskey}}">
+            <input type="hidden" class="stackgen-review-courseid" value="{{courseid}}">
+            <input type="hidden" class="stackgen-review-actionurl" value="{{confirmurl}}">
+
+            {{# reviewproblems }}
+            <div class="card mb-3 stackgen-review-problem" data-problem-index="{{index}}">
+                <div class="card-header">
+                    <span class="font-weight-bold">問題 {{displaynum}}</span>
+                    <span class="text-muted small ml-2"><code>{{question_type}}</code></span>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-3 small">
+                        <dt class="col-sm-2">{{# str }} ocr_question_text, qbank_stackgen {{/ str }}</dt>
+                        <dd class="col-sm-10">{{question_text}}</dd>
+                        <dt class="col-sm-2">{{# str }} ocr_problem_expression, qbank_stackgen {{/ str }}</dt>
+                        <dd class="col-sm-10">
+                            <code>{{problem_expression}}</code>
+                            <div class="mt-1">\( {{problem_expression}} \)</div>
+                        </dd>
+                        {{# has_answer }}
+                        <dt class="col-sm-2">{{# str }} ocr_answer_expression, qbank_stackgen {{/ str }}</dt>
+                        <dd class="col-sm-10">
+                            <code>{{answer_expression}}</code>
+                            <div class="mt-1">\( {{answer_expression}} \)</div>
+                        </dd>
+                        {{/ has_answer }}
+                    </dl>
+
+                    <h4 class="h6">{{# str }} review_wronganswers_heading, qbank_stackgen {{/ str }}</h4>
+
+                    <div class="stackgen-wronganswer-list" data-problem-index="{{index}}">
+                        {{# wronganswers }}
+                        <div class="row stackgen-wronganswer-row align-items-start mb-2 pb-2 border-bottom" data-row-index="{{index}}">
+                            <div class="col-md-4">
+                                <label class="small mb-1 d-block">{{# str }} review_wa_expression, qbank_stackgen {{/ str }}</label>
+                                <input type="text" class="form-control form-control-sm stackgen-wa-expression" value="{{expression}}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small mb-1 d-block">{{# str }} review_wa_misconception, qbank_stackgen {{/ str }}</label>
+                                <input type="text" class="form-control form-control-sm stackgen-wa-misconception" value="{{misconception}}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small mb-1 d-block">{{# str }} review_wa_feedback, qbank_stackgen {{/ str }}</label>
+                                <textarea class="form-control form-control-sm stackgen-wa-feedback" rows="2">{{feedback}}</textarea>
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end justify-content-end">
+                                <button type="button" class="btn btn-sm btn-outline-danger stackgen-wa-remove" title="{{# str }} review_wa_remove, qbank_stackgen {{/ str }}">&times;</button>
+                            </div>
+                        </div>
+                        {{/ wronganswers }}
+                    </div>
+
+                    <template class="stackgen-wronganswer-template">
+                        <div class="row stackgen-wronganswer-row align-items-start mb-2 pb-2 border-bottom" data-row-index="__INDEX__">
+                            <div class="col-md-4">
+                                <label class="small mb-1 d-block">{{# str }} review_wa_expression, qbank_stackgen {{/ str }}</label>
+                                <input type="text" class="form-control form-control-sm stackgen-wa-expression" value="">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small mb-1 d-block">{{# str }} review_wa_misconception, qbank_stackgen {{/ str }}</label>
+                                <input type="text" class="form-control form-control-sm stackgen-wa-misconception" value="">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small mb-1 d-block">{{# str }} review_wa_feedback, qbank_stackgen {{/ str }}</label>
+                                <textarea class="form-control form-control-sm stackgen-wa-feedback" rows="2"></textarea>
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end justify-content-end">
+                                <button type="button" class="btn btn-sm btn-outline-danger stackgen-wa-remove" title="{{# str }} review_wa_remove, qbank_stackgen {{/ str }}">&times;</button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <button type="button" class="btn btn-sm btn-outline-secondary stackgen-wa-add" data-problem-index="{{index}}">
+                        {{# str }} review_wa_add, qbank_stackgen {{/ str }}
+                    </button>
+                </div>
+            </div>
+            {{/ reviewproblems }}
+
+            <button type="button" class="btn btn-primary btn-sm stackgen-review-confirm" data-jobid="{{id}}">
+                {{# str }} review_confirm_button, qbank_stackgen {{/ str }}
+            </button>
+            <span class="stackgen-review-status ml-2 small text-muted"></span>
+        </div>
+        {{/ hasreviewproblems }}
+    </div>
+    {{/ canreview }}
+    {{# canretry }}
+    <div class="card-body border-top pt-2 pb-2">
+        <form method="post" action="{{actionurl}}">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <input type="hidden" name="courseid" value="{{courseid}}">
+            <input type="hidden" name="action" value="retry">
+            <input type="hidden" name="jobid" value="{{id}}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                {{# str }} retry_button, qbank_stackgen {{/ str }}
+            </button>
+            {{# retry_count }}
+            <small class="text-muted ml-2">{{# str }} retry_count_label, qbank_stackgen, {{retry_count}} {{/ str }}</small>
+            {{/ retry_count }}
+        </form>
+    </div>
+    {{/ canretry }}
+</div>
