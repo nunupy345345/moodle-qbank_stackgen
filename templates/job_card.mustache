@@ -122,9 +122,16 @@
                     <span class="text-muted small ml-2"><code>{{question_type}}</code></span>
                 </div>
                 <div class="card-body">
+                    <div class="mb-2">
+                        <label class="small mb-1 d-block">{{# str }} review_problem_name, qbank_stackgen {{/ str }}</label>
+                        <input type="text" class="form-control form-control-sm stackgen-review-name" value="{{name}}">
+                    </div>
+
                     <dl class="row mb-3 small">
                         <dt class="col-sm-2">{{# str }} ocr_question_text, qbank_stackgen {{/ str }}</dt>
-                        <dd class="col-sm-10">{{question_text}}</dd>
+                        <dd class="col-sm-10">
+                            <textarea class="form-control form-control-sm stackgen-review-questiontext" rows="3">{{question_text}}</textarea>
+                        </dd>
                         <dt class="col-sm-2">{{# str }} ocr_problem_expression, qbank_stackgen {{/ str }}</dt>
                         <dd class="col-sm-10">
                             <code>{{problem_expression}}</code>

@@ -73,6 +73,7 @@ class get_job_statuses extends external_api {
         $reviewproblemstructure = array_merge($problemstructure, [
             'index'        => new external_value(PARAM_INT, 'Problem index'),
             'displaynum'   => new external_value(PARAM_INT, 'Display number (1-based)'),
+            'name'         => new external_value(PARAM_TEXT, 'Question name (editable default)', VALUE_DEFAULT, ''),
             'wronganswers' => new external_multiple_structure(
                 new external_single_structure($wronganswerstructure),
                 'Wrong answers', VALUE_DEFAULT, []

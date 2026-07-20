@@ -58,6 +58,7 @@ $string['review_link']                   = 'Review wrong answers & feedback';
 // Review page (Stage 3).
 $string['review_page_title']             = 'Review wrong answers & feedback';
 $string['review_instructions']           = 'Review and edit the AI-generated wrong-answer examples and feedback below. Once confirmed, they will be used to generate the PRT (scoring logic) in the STACK XML.';
+$string['review_problem_name']           = 'Question name';
 $string['review_wronganswers_heading']   = 'Wrong-answer examples & feedback';
 $string['review_wa_expression']          = 'Wrong answer (Maxima expression)';
 $string['review_wa_misconception']       = 'Likely cause';

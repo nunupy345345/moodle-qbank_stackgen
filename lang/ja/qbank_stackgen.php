@@ -62,6 +62,7 @@ $string['review_link']                   = '誤答例・フィードバックを
 // Review page (Stage 3).
 $string['review_page_title']             = '誤答例・フィードバックのレビュー';
 $string['review_instructions']           = 'AIが生成した誤答例とフィードバック案を確認・修正してください。確定するとSTACK XMLのPRT（採点ロジック）に反映されます。';
+$string['review_problem_name']           = '問題名';
 $string['review_wronganswers_heading']   = '誤答例・フィードバック';
 $string['review_wa_expression']          = '誤答の式（Maxima記法）';
 $string['review_wa_misconception']       = '想定される誤りの原因';

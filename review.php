@@ -52,6 +52,9 @@ if (!is_array($decoded) || !isset($decoded['problems']) || !is_array($decoded['p
 // サーバー側でも構造を整形（不正なキーを排除）。
 $confirmed = ['problems' => []];
 foreach ($decoded['problems'] as $p) {
+    $name         = trim((string)($p['name'] ?? ''));
+    $questiontext = trim((string)($p['questiontext'] ?? ''));
+
     $wronganswers = [];
     foreach ((array)($p['wronganswers'] ?? []) as $w) {
         $expression = trim((string)($w['expression'] ?? ''));
@@ -64,7 +67,7 @@ foreach ($decoded['problems'] as $p) {
             'feedback'      => trim((string)($w['feedback'] ?? '')),
         ];
     }
-    $confirmed['problems'][] = ['wronganswers' => $wronganswers];
+    $confirmed['problems'][] = ['name' => $name, 'questiontext' => $questiontext, 'wronganswers' => $wronganswers];
 }
 
 $DB->update_record('qbank_stackgen_jobs', (object)[

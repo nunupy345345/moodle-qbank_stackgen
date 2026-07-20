@@ -34,6 +34,8 @@ class feedback_generator {
 - 誤答は2〜4個程度、実際によくある間違いを想定すること（符号ミス、係数ミス、公式の取り違え、定数項の付け忘れ等）。
 - expression は正答と必ず異なる Maxima 式にすること。
 - feedback は学生が自分の間違いに気づけるよう、具体的な誤りの箇所を指摘すること。
+- feedback 内で数式を使う場合の区切りは \( ... \) とし、$ ... $ は使わないこと。
+- 【重要】JSON 文字列内のバックスラッシュは必ず \\ とエスケープすること（例: "\\( x \\)"）。
 SYS;
 
     /**
@@ -86,33 +88,13 @@ SYS;
 
         $url = self::ENDPOINT . '?key=' . urlencode($api_key);
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $body,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        ]);
-
-        $response   = curl_exec($ch);
-        $http_code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curl_error = curl_error($ch);
-        curl_close($ch);
-
-        if ($curl_error) {
-            throw new \moodle_exception('error_generic', 'qbank_stackgen', '', null,
-                "Gemini curl error (feedback, problem #{$num}): {$curl_error}");
-        }
-        if ($http_code !== 200) {
-            throw new \moodle_exception('error_generic', 'qbank_stackgen', '', null,
-                "Gemini API HTTP {$http_code} (feedback, problem #{$num}): {$response}");
-        }
+        $response = gemini_http_client::post($url, $body, "feedback, problem #{$num}");
 
         $decoded   = json_decode($response, true);
         $json_text = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? '';
 
-        $parsed = json_decode($json_text, true);
+        // LaTeX 由来の生バックスラッシュによる不正 JSON / サイレント破損を防ぐため常に修復してからパースする。
+        $parsed = json_decode(self::repair_json_escapes($json_text), true);
         if (!is_array($parsed) || !isset($parsed['wronganswers']) || !is_array($parsed['wronganswers'])) {
             throw new \moodle_exception('error_generic', 'qbank_stackgen', '', null,
                 "Gemini feedback JSON parse failed (problem #{$num}): {$json_text}");
@@ -131,5 +113,25 @@ SYS;
         }
 
         return $wronganswers;
+    }
+
+    /**
+     * JSON 文字列内の LaTeX 由来の生バックスラッシュ（\( \) \frac \theta 等）を修復する。
+     *
+     * そのまま残す有効エスケープは \" \\ \/ \n \uXXXX のみ。
+     * \b \f \r \t は JSON としては正規のエスケープだが、この用途では
+     * \frac, \beta, \theta, \right 等の LaTeX コマンドである可能性が圧倒的に高く、
+     * 放置すると「パースは成功するのに中身が制御文字に化ける」サイレント破損を起こすため、
+     * これらも \\ に倒して文字どおりのバックスラッシュとして扱う。
+     */
+    private static function repair_json_escapes(string $json): string {
+        return preg_replace_callback(
+            '/\\\\(?:u[0-9a-fA-F]{4}|["\\\\\/n])|\\\\/s',
+            function (array $m): string {
+                // 有効なエスケープ（長さ2以上でマッチ）はそのまま、それ以外の \ は \\ に。
+                return strlen($m[0]) > 1 ? $m[0] : '\\\\';
+            },
+            $json
+        );
     }
 }

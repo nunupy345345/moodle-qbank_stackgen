@@ -56,6 +56,15 @@ class job_view {
     }
 
     /**
+     * レビュー画面の問題名入力欄に入れる既定値。
+     * 問題文からの自動抜粋はLaTeXの区切り（\( \)）途中で切れて読みにくいため、
+     * 連番の仮名にとどめ、教員に実際の名前を付けてもらう。
+     */
+    private static function default_problem_name(int $displaynum): string {
+        return "問題 {$displaynum}";
+    }
+
+    /**
      * job_card.mustache（テンプレート）が必要とする全フィールドを1ジョブ分組み立てる。
      *
      * @param \stdClass $job          qbank_stackgen_jobs の1レコード
@@ -128,6 +137,7 @@ class job_view {
                 $reviewproblems[] = [
                     'index'              => $i,
                     'displaynum'         => $i + 1,
+                    'name'               => self::default_problem_name($i + 1),
                     'question_text'      => $p['question_text'] ?? '',
                     'question_type'      => $p['question_type'] ?? '',
                     'problem_expression' => $p['problem_expression'] ?? '',
