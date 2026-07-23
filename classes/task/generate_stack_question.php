@@ -249,11 +249,15 @@ class generate_stack_question extends \core\task\adhoc_task {
         try {
             $result = \qbank_stackgen\question_importer::import($job);
 
+            // 承認済み（問題バンク登録完了）になったので、一時保存していた元画像は不要になる。
+            // CLAUDE.md記載の方針「image_b64はDBに一時保存のみ。承認/却下後に削除する」に従い、
+            // ここで確実に削除する（xml_result等の生成結果は評価データとして残す）。
             $DB->update_record('qbank_stackgen_jobs', (object)[
                 'id'                    => $jobid,
                 'status'                => 'approved',
                 'question_ids'          => json_encode($result['questionids']),
                 'question_category_id'  => $result['categoryid'],
+                'image_b64'             => null,
                 'error_msg'             => null,
                 'timemodified'          => time(),
             ]);
