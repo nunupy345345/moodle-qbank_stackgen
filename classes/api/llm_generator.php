@@ -76,22 +76,29 @@ PRT（採点ロジック）付きの <question type="stack">...</question> ブ�
 
 【誤答例が渡された場合の PRT 分岐設計ルール（重要）】
 教員が確定した誤答例が渡された場合、正答判定ノードに続けて、誤答例の数だけ判定ノードを直列に追加すること。
+実際に教員が作り込んだ質の高いPRT問題を分析した結果、誤答には常に0点を与えるのではなく、
+誤りの重大さに応じてtruescoreを段階的に配点しているものほど質が高い（採点の解像度が高い）とわかっている。
 
 - ノード1: 学生解答（ans1）と正答（ta）を選択済みの answertest で比較する。
   - true（正解） → truescore 1、truenextnode -1（終端）、trueanswernote "prt1-1-T"
   - false（不正解） → falsenextnode は次の誤答判定ノード（誤答例がなければ -1）
 - ノード2以降（誤答例ごとに1ノード）: 学生解答（ans1）と誤答例の式（wa1, wa2, ... を questionvariables で定義）を
   ATAlgEquiv で比較する。
-  - true（その誤答と一致） → falsescoremode/falsescore ではなく truescore 0、truenextnode -1（終端）、
-    truefeedback に教員が確定したフィードバック文をそのまま使う（HTML可）
+  - true（その誤答と一致） → **truescore を 0 固定にしないこと。** 教員が入力した「想定原因」の重大さを見て
+    0.1〜0.9 の範囲で個別に配点する（目安: 符号ミス・積分定数忘れ等の軽微な計算ミス→0.7〜0.9、
+    公式自体を取り違えている等の概念的な誤り→0.1〜0.3）。誤答例が複数ある場合、
+    全ノードのtruescoreが同じ値にならないよう、誤りごとに差をつけること。
+    truenextnode -1（終端）、truefeedback に教員が確定したフィードバック文をそのまま使う（HTML可）。
   - false（一致しない） → falsenextnode は次の誤答判定ノードの name（最後のノードなら -1、
     その場合 falsefeedback は「不正解です。」等の汎用フィードバックにする）
 - 誤答例が渡されなかった場合は、従来通り正誤2択（AlgEquiv 1ノード）で構成すること。
 
-【誤答例ありの場合の PRT 構造例（誤答例2個: wa1, wa2）】
+【誤答例ありの場合の PRT 構造例（積分・誤答例2個: wa1, wa2）】
+※ node1 の answertest は「Answer Test選択ルール」に従って問題タイプごとに変わる（この例は積分なので Int）。
+   node2以降の誤答判定ノードは常に ATAlgEquiv（学生解答が誤答例の式と数式的に一致するか）でよい。
 ※ 下例では紙幅の都合で省略しているが、実際の出力では各 <node> に
    <description></description> <truepenalty></truepenalty> <falsepenalty></falsepenalty> も含めること。
-<questionvariables><text>ta: x^2+2*x+1; wa1: x^2-2*x+1; wa2: x^2+2*x-1;</text></questionvariables>
+<questionvariables><text>ta: x^2/2 + c; wa1: x^2/2; wa2: x^2 + c;</text></questionvariables>
 ...
 <prt>
   <name>prt1</name>
@@ -101,10 +108,10 @@ PRT（採点ロジック）付きの <question type="stack">...</question> ブ�
   <feedbackvariables><text></text></feedbackvariables>
   <node>
     <name>1</name>
-    <answertest>AlgEquiv</answertest>
+    <answertest>Int</answertest>
     <sans>ans1</sans>
     <tans>ta</tans>
-    <testoptions></testoptions>
+    <testoptions>x</testoptions>
     <quiet>0</quiet>
     <truescoremode>=</truescoremode>
     <truescore>1</truescore>
@@ -125,10 +132,10 @@ PRT（採点ロジック）付きの <question type="stack">...</question> ブ�
     <testoptions></testoptions>
     <quiet>0</quiet>
     <truescoremode>=</truescoremode>
-    <truescore>0</truescore>
+    <truescore>0.9</truescore>
     <truenextnode>-1</truenextnode>
     <trueanswernote>prt1-2-T</trueanswernote>
-    <truefeedback format="html"><text><![CDATA[<p>（誤答1のフィードバック文）</p>]]></text></truefeedback>
+    <truefeedback format="html"><text><![CDATA[<p>積分定数 C を忘れています。忘れずに付け加えましょう。</p>]]></text></truefeedback>
     <falsescoremode>=</falsescoremode>
     <falsescore>0</falsescore>
     <falsenextnode>3</falsenextnode>
@@ -143,10 +150,10 @@ PRT（採点ロジック）付きの <question type="stack">...</question> ブ�
     <testoptions></testoptions>
     <quiet>0</quiet>
     <truescoremode>=</truescoremode>
-    <truescore>0</truescore>
+    <truescore>0.2</truescore>
     <truenextnode>-1</truenextnode>
     <trueanswernote>prt1-3-T</trueanswernote>
-    <truefeedback format="html"><text><![CDATA[<p>（誤答2のフィードバック文）</p>]]></text></truefeedback>
+    <truefeedback format="html"><text><![CDATA[<p>べき乗の積分公式（次数を1つ上げて次数で割る）を確認しましょう。</p>]]></text></truefeedback>
     <falsescoremode>=</falsescoremode>
     <falsescore>0</falsescore>
     <falsenextnode>-1</falsenextnode>
