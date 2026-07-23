@@ -103,13 +103,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Render upload form.
+// ページ構成: 1ページ目（page=0）は最新1件のみ、2ページ目以降（page>=1）は残りを10件ずつページングする。
+// そのため件数がページによって違い、Moodle標準の paging_bar（全ページ同じperpage前提）はそのまま使えない。
+$page    = optional_param('page', 0, PARAM_INT);
+$perpage = 10;
+
 $PAGE->requires->js_call_amd('qbank_stackgen/upload', 'init', ['stackgen-upload-form']);
 $PAGE->requires->js_call_amd('qbank_stackgen/job_review', 'init');
-$PAGE->requires->js_call_amd('qbank_stackgen/status_poll', 'init', [$courseid]);
+// ポーリングは1ページ目（最新1件）だけが対象。過去ページの古いジョブはもう状態が変わらないので
+// ポーリングさせない（get_job_statuses も常に最新1件しか返さないため、2ページ目以降で回しても無意味）。
+if ($page === 0) {
+    $PAGE->requires->js_call_amd('qbank_stackgen/status_poll', 'init', [$courseid]);
+}
 
 echo $OUTPUT->header();
 
-// Fetch recent jobs for this user in this course.
+// Fetch jobs for this user in this course, newest first, paged.
+$totalcount = $DB->count_records_select(
+    'qbank_stackgen_jobs',
+    'courseid = ? AND userid = ?',
+    [$courseid, $USER->id]
+);
+
+if ($page <= 0) {
+    $limitfrom = 0;
+    $limitnum  = 1;
+} else {
+    $limitfrom = 1 + ($page - 1) * $perpage;
+    $limitnum  = $perpage;
+}
+
 $dbjobs = $DB->get_records_select(
     'qbank_stackgen_jobs',
     'courseid = ? AND userid = ?',
@@ -117,13 +140,37 @@ $dbjobs = $DB->get_records_select(
     'id DESC',
     'id, status, ocr_result, feedback_result, feedback_confirmed, xml_result, error_msg, ' .
         'question_category_id, retry_count, timecreated',
-    0, 10
+    $limitfrom, $limitnum
 );
 
 $sesskey = sesskey();
 $jobs = [];
 foreach ($dbjobs as $job) {
     $jobs[] = \qbank_stackgen\local\job_view::build($job, $courseid, $sesskey);
+}
+
+// 1ページ目=1件、2ページ目以降=10件という不均等な構成なので、独自の簡易ページャーを組み立てる
+// （$OUTPUT->paging_bar は全ページ同じperpage前提のため、この構成には使えない）。
+$remaining  = max(0, $totalcount - 1);
+$extrapages = (int)ceil($remaining / $perpage);
+$totalpages = 1 + $extrapages;
+
+$pagingbar = '';
+if ($totalpages > 1) {
+    $links = [];
+    for ($p = 0; $p < $totalpages; $p++) {
+        $label = (string)($p + 1);
+        if ($p === $page) {
+            $links[] = html_writer::span($label, 'font-weight-bold px-2');
+        } else {
+            $links[] = html_writer::link(
+                new moodle_url($PAGE->url, ['page' => $p]), $label, ['class' => 'px-2']
+            );
+        }
+    }
+    $pagingbar = html_writer::tag(
+        'nav', implode(' ', $links), ['class' => 'stackgen-paging mt-2', 'aria-label' => 'job list paging']
+    );
 }
 
 // Trigger MathJax re-typeset after DOM is ready.
@@ -149,6 +196,7 @@ $templatecontext = [
     'formid'    => 'stackgen-upload-form',
     'jobs'      => $jobs,
     'hasjobs'   => !empty($jobs),
+    'pagingbar' => $pagingbar,
 ];
 
 echo $OUTPUT->render_from_template('qbank_stackgen/upload_form', $templatecontext);

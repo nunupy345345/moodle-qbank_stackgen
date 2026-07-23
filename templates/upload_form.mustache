@@ -7,6 +7,8 @@
       - formid:    HTML id of the form element
       - jobs:      array of recent job objects
       - hasjobs:   boolean
+      - pagingbar: rendered HTML of the paging nav (upload.php builds this manually;
+                   page 0 has 1 item, page >=1 has 10 each, so core paging_bar can't be reused)
 }}
 <div class="qbank-stackgen-upload">
     <h2>{{# str }} upload_page_title, qbank_stackgen {{/ str }}</h2>
@@ -46,5 +48,6 @@
     {{# jobs }}
     {{> qbank_stackgen/job_card }}
     {{/ jobs }}
+    {{{ pagingbar }}}
 </div>
 {{/ hasjobs }}

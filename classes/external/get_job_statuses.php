@@ -35,6 +35,8 @@ class get_job_statuses extends external_api {
         self::validate_context($context);
         require_capability('moodle/question:add', $context);
 
+        // upload.php の1ページ目（page=0）は最新1件だけを表示・ポーリング対象にする構成なので、
+        // ここで返すジョブもそれに合わせて最新1件のみにする。
         $dbjobs = $DB->get_records_select(
             'qbank_stackgen_jobs',
             'courseid = ? AND userid = ?',
@@ -42,7 +44,7 @@ class get_job_statuses extends external_api {
             'id DESC',
             'id, status, ocr_result, feedback_result, feedback_confirmed, xml_result, error_msg, ' .
                 'question_category_id, retry_count, timecreated',
-            0, 10
+            0, 1
         );
 
         $sesskey = sesskey();
