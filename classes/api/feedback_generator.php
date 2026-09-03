@@ -41,11 +41,13 @@ SYS;
     /**
      * 複数問の OCR 結果それぞれについて誤答例/フィードバック案を生成する。
      *
-     * @param array $problems  gemini_ocr::run() が返す problems 配列
+     * @param array $problems     gemini_ocr::run() が返す problems 配列
+     * @param array $ragexamples  Step 6 RAG: $problems と同じ順序で、rag_search::search() の結果配列を並べたもの。
+     *                            要素が空配列の問題はRAGなしで生成する。
      * @return array  ['problems' => [['wronganswers' => [...]], ...]]  （$problems と同じ順序）
      * @throws \moodle_exception APIキー未設定・通信エラーのとき
      */
-    public function run(array $problems): array {
+    public function run(array $problems, array $ragexamples = []): array {
         $api_key = get_config('qbank_stackgen', 'google_api_key');
         if (empty($api_key)) {
             throw new \moodle_exception('error_llm_api_key_missing', 'qbank_stackgen');
@@ -53,7 +55,7 @@ SYS;
 
         $result = [];
         foreach ($problems as $i => $problem) {
-            $result[] = ['wronganswers' => $this->generate_one($api_key, $problem, $i + 1)];
+            $result[] = ['wronganswers' => $this->generate_one($api_key, $problem, $i + 1, $ragexamples[$i] ?? [])];
         }
 
         return ['problems' => $result];
@@ -62,9 +64,10 @@ SYS;
     /**
      * 1問分の誤答例/フィードバック案を生成する。
      *
+     * @param array $examples  Step 6 RAG: この問題に類似した過去の良問（rag_search::search()の結果）
      * @return array  [['expression'=>..., 'misconception'=>..., 'feedback'=>...], ...]
      */
-    private function generate_one(string $api_key, array $problem, int $num): array {
+    private function generate_one(string $api_key, array $problem, int $num, array $examples = []): array {
         $qtext  = $problem['question_text']      ?? '';
         $qtype  = $problem['question_type']      ?? 'other';
         $expr   = $problem['problem_expression'] ?? '';
@@ -76,6 +79,8 @@ SYS;
             . "問題タイプ: {$qtype}\n"
             . "LaTeX 式: {$expr}\n"
             . ($answer !== null ? "正答（LaTeX）: {$answer}\n" : "※正答は不明。問題の内容から妥当な誤答パターンを推測すること。\n");
+
+        $user_msg .= self::build_rag_block($examples);
 
         $body = json_encode([
             'system_instruction' => ['parts' => [['text' => self::SYSTEM]]],
@@ -113,6 +118,24 @@ SYS;
         }
 
         return $wronganswers;
+    }
+
+    /**
+     * Step 6 RAG: 類似する過去の良問（教員手作りコーパス）をFew-shotとしてプロンプトに追記する文字列を作る。
+     * 誤答例そのものではなく、似た問題がどんなカテゴリ・問題文だったかを参考情報として渡す
+     * （wronganswersの本文はコーパスに保存していないため、あくまで「傾向を推測する参考」としての位置づけ）。
+     */
+    private static function build_rag_block(array $examples): string {
+        if (empty($examples)) {
+            return '';
+        }
+
+        $block = "\n参考: 過去に教員が作成した類似問題（内容の近さの参考。丸写しではなく、似た誤りの傾向を推測する材料にすること）:\n";
+        foreach ($examples as $j => $ex) {
+            $n = $j + 1;
+            $block .= "  類似問題{$n}（カテゴリ: " . ($ex['category'] ?? '') . "）: " . ($ex['qtext'] ?? '') . "\n";
+        }
+        return $block;
     }
 
     /**

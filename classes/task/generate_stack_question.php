@@ -16,6 +16,10 @@ namespace qbank_stackgen\task;
  * Stage 4（XML生成）の後、教員の操作を待たずに同一実行内でStage 5（CAS検証、goemaxima）に
  * 進む。検証NGの場合は設定 `max_retry`（既定3回）まで、直前の検証エラーをLLMに伝えつつ
  * 同一実行内でStage 4から再生成する。検証OKならStage 6（問題バンク登録）まで自動的に進む。
+ *
+ * Step 6（RAG）: Stage 3突入時（run_feedback_stage）に一度だけ教員手作りコーパス
+ * （qbank_stackgen_examples）を検索し、結果を rag_examples_used に保存する。
+ * Stage 4（run_xml_stage）はCAS検証リトライのたびに再検索せず、この保存結果を使い回す。
  */
 class generate_stack_question extends \core\task\adhoc_task {
 
@@ -106,7 +110,10 @@ class generate_stack_question extends \core\task\adhoc_task {
             }
             unset($problem);
 
-            $this->run_xml_stage($jobid, $problems, $feedbackproblems);
+            // Step 6 RAG: Stage 3突入時に検索・保存済みの結果をそのまま再利用する（ここで再検索しない）。
+            $ragresults = json_decode($job->rag_examples_used ?? '', true) ?: [];
+
+            $this->run_xml_stage($jobid, $problems, $feedbackproblems, $ragresults);
             return;
         }
 
@@ -122,6 +129,9 @@ class generate_stack_question extends \core\task\adhoc_task {
 
     /**
      * Stage 3: 誤答例/フィードバック案を生成し、教員のレビュー待ちにする。
+     *
+     * Step 6 RAG: ジョブごとに1回だけ類似問題を検索し、結果を rag_examples_used に保存する
+     * （CAS検証リトライのたびに再検索はせず、Stage 4（run_xml_stage）でもこの保存結果を再利用する）。
      */
     private function run_feedback_stage(int $jobid, array $problems): void {
         global $DB;
@@ -132,14 +142,17 @@ class generate_stack_question extends \core\task\adhoc_task {
                     'OCR result contains no problems');
             }
 
+            $ragresults = $this->run_rag_search($jobid, $problems);
+
             $generator = new \qbank_stackgen\api\feedback_generator();
-            $feedback  = $generator->run($problems);
+            $feedback  = $generator->run($problems, $ragresults);
 
             $DB->update_record('qbank_stackgen_jobs', (object)[
-                'id'               => $jobid,
-                'status'           => 'feedback_pending',
-                'feedback_result'  => json_encode($feedback, JSON_UNESCAPED_UNICODE),
-                'timemodified'     => time(),
+                'id'                => $jobid,
+                'status'            => 'feedback_pending',
+                'feedback_result'   => json_encode($feedback, JSON_UNESCAPED_UNICODE),
+                'rag_examples_used' => json_encode($ragresults, JSON_UNESCAPED_UNICODE),
+                'timemodified'      => time(),
             ]);
             mtrace("[qbank_stackgen] Job {$jobid}: feedback draft generated, awaiting teacher review.");
 
@@ -155,11 +168,40 @@ class generate_stack_question extends \core\task\adhoc_task {
     }
 
     /**
+     * Step 6 RAG: OCR結果の各問題文で教員手作りコーパス（qbank_stackgen_examples）を検索する。
+     * 設定で無効化されている場合や埋め込みAPI呼び出しに失敗した場合は、パイプライン全体を
+     * 止めずに空の検索結果を返す（RAGはあくまで精度向上のための追加要素であり必須ではないため）。
+     *
+     * @return array $problems と同じ順序の配列。各要素は rag_search::search() の結果（空配列もありうる）。
+     */
+    private function run_rag_search(int $jobid, array $problems): array {
+        if (empty(get_config('qbank_stackgen', 'rag_enabled'))) {
+            return array_fill(0, count($problems), []);
+        }
+
+        $topk = max(1, (int)(get_config('qbank_stackgen', 'rag_topk') ?: 3));
+        $results = [];
+        foreach ($problems as $i => $problem) {
+            try {
+                $querytext = $problem['stack_question_text'] ?? ($problem['question_text'] ?? '');
+                $results[$i] = $querytext !== '' ? \qbank_stackgen\local\rag_search::search($querytext, $topk) : [];
+            } catch (\Throwable $e) {
+                mtrace("[qbank_stackgen] Job {$jobid}: RAG search failed for problem #" . ($i + 1)
+                    . ", continuing without it: " . $e->getMessage());
+                $results[$i] = [];
+            }
+        }
+        return $results;
+    }
+
+    /**
      * Stage 4〜5: 確定済みの誤答例/フィードバックを組み込んで STACK XML（PRT付き）を生成し、
      * CAS検証（goemaxima）に通す。検証NGの場合は設定上限（max_retry）まで、直前の検証エラーを
      * LLMに伝えつつ同一タスク実行内で再生成する。教員の操作は待たない。
+     *
+     * @param array $ragresults  Step 6 RAG: run_feedback_stage() が検索・保存した結果（再検索しない）。
      */
-    private function run_xml_stage(int $jobid, array $problems, array $feedbackproblems): void {
+    private function run_xml_stage(int $jobid, array $problems, array $feedbackproblems, array $ragresults = []): void {
         global $DB;
 
         $maxretry  = max(1, (int)(get_config('qbank_stackgen', 'max_retry') ?: 3));
@@ -170,7 +212,7 @@ class generate_stack_question extends \core\task\adhoc_task {
         for ($attempt = 1; $attempt <= $maxretry; $attempt++) {
             try {
                 $generator = new \qbank_stackgen\api\llm_generator();
-                $output    = $generator->run($problems, $feedbackproblems, $lasterror);
+                $output    = $generator->run($problems, $feedbackproblems, $lasterror, $ragresults);
             } catch (\Throwable $e) {
                 $DB->update_record('qbank_stackgen_jobs', (object)[
                     'id'           => $jobid,

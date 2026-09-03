@@ -32,6 +32,11 @@ $string['settings_maxima_url']           = 'goemaxima URL';
 $string['settings_maxima_url_desc']      = 'goemaxima サービスのURL（Dockerネットワーク内）。';
 $string['settings_max_retry']            = 'CAS検証 最大再試行回数';
 $string['settings_max_retry_desc']       = 'CAS検証失敗時にLLM再生成を試みる最大回数。';
+$string['settings_rag_heading']          = 'RAG設定（Step 6）';
+$string['settings_rag_enabled']          = 'RAG検索を有効にする';
+$string['settings_rag_enabled_desc']     = '教員手作りの良問コーパス（qbank_stackgen_examples）を検索し、Stage3/4のプロンプトに類似例を組み込む。無効にすると従来通り検索なしで生成する。';
+$string['settings_rag_topk']             = 'RAG検索件数（top-k）';
+$string['settings_rag_topk_desc']        = 'プロンプトに組み込む類似問題の件数。';
 
 // Job statuses.
 $string['status_pending']                = '処理待ち';

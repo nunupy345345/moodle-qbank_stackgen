@@ -246,10 +246,11 @@ SYS;
      *                                 同じ順序で並べた配列（教員が review.php で確定したもの）。空でもよい。
      * @param string $lasterror  直前の試行がCAS検証(Stage 5)で失敗した場合のエラー内容。
      *                           再生成時にLLMへ伝え、同じ間違いを繰り返しにくくする。空でもよい。
+     * @param array $ragexamples  Step 6 RAG: $problems と同じ順序で、rag_search::search() の結果配列を並べたもの。
      * @return array  ['xml' => "<?xml...><quiz>...</quiz>", 'cot' => "問題ごとの思考過程を連結したテキスト"]
      * @throws \moodle_exception APIキー未設定・通信エラー・XML不正のとき
      */
-    public function run(array $problems, array $feedbackproblems = [], string $lasterror = ''): array {
+    public function run(array $problems, array $feedbackproblems = [], string $lasterror = '', array $ragexamples = []): array {
         $api_key = get_config('qbank_stackgen', 'google_api_key');
         if (empty($api_key)) {
             throw new \moodle_exception('error_llm_api_key_missing', 'qbank_stackgen');
@@ -260,7 +261,8 @@ SYS;
         foreach ($problems as $i => $problem) {
             $name         = $feedbackproblems[$i]['name'] ?? '';
             $wronganswers = $feedbackproblems[$i]['wronganswers'] ?? [];
-            [$xml, $cot]  = $this->generate_one($api_key, $problem, $i + 1, $wronganswers, $name, $lasterror);
+            [$xml, $cot]  = $this->generate_one(
+                $api_key, $problem, $i + 1, $wronganswers, $name, $lasterror, $ragexamples[$i] ?? []);
             $question_xmls[] = $xml;
             if ($cot !== '') {
                 $cots[] = "--- 問題{$i}のCoT ---\n{$cot}";
@@ -280,10 +282,12 @@ SYS;
      * @param array $wronganswers  [['expression'=>..., 'misconception'=>..., 'feedback'=>...], ...]
      * @param string $name  教員がレビュー画面で確定した問題名。空ならLLM任せの名前をそのまま使う。
      * @param string $lasterror  直前の試行のCAS検証エラー内容。空でなければ再生成時にLLMへ伝える。
+     * @param array $examples  Step 6 RAG: この問題に類似した過去の良問（rag_search::search()の結果）
      * @return array [xml, cot]
      */
     private function generate_one(
-        string $api_key, array $problem, int $num, array $wronganswers, string $name = '', string $lasterror = ''
+        string $api_key, array $problem, int $num, array $wronganswers, string $name = '', string $lasterror = '',
+        array $examples = []
     ): array {
         $qtype     = $problem['question_type'] ?? 'other';
         $variables = $problem['variables']     ?? ['x'];
@@ -323,6 +327,8 @@ SYS;
             $user_msg .= "\n前回の生成はCAS検証（Maximaでの数式チェック）で以下のエラーが検出されました。"
                 . "同じ間違いを繰り返さないよう修正して再生成すること:\n{$lasterror}\n";
         }
+
+        $user_msg .= self::build_rag_block($examples);
 
         $body = json_encode([
             'system_instruction' => ['parts' => [['text' => self::SYSTEM]]],
@@ -395,6 +401,29 @@ SYS;
 
         // 抽出失敗時はそのまま返す（後続で XML 検証が拾う）
         return [$raw_text, ''];
+    }
+
+    /**
+     * Step 6 RAG: 類似する過去の良問のPRT構造的特徴をFew-shotとしてプロンプトに追記する文字列を作る。
+     * 教員手作りの良問データセット分析(fixtures/prt/README.md)で確認された「段階的部分点チェーン」
+     * 「専用Answer Testの使用」の傾向を、類似問題の実測値として具体的に示す。
+     */
+    private static function build_rag_block(array $examples): string {
+        if (empty($examples)) {
+            return '';
+        }
+
+        $block = "\n参考: 過去に教員が作成した類似問題のPRT構造（内容の丸写しではなく、"
+            . "ノード数・Answer Test・段階的部分点の付け方の参考にすること）:\n";
+        foreach ($examples as $j => $ex) {
+            $n = $j + 1;
+            $tests  = !empty($ex['distinct_tests'])  ? implode(', ', $ex['distinct_tests'])  : '(不明)';
+            $scores = !empty($ex['distinct_scores']) ? implode(', ', $ex['distinct_scores']) : '(不明)';
+            $block .= "  類似問題{$n}: 問題文=" . ($ex['qtext'] ?? '') . "\n"
+                . "    PRTノード数=" . ($ex['n_nodes'] ?? '?') . "、使用Answer Test=[{$tests}]、"
+                . "truescoreの段階=[{$scores}]\n";
+        }
+        return $block;
     }
 
     /**

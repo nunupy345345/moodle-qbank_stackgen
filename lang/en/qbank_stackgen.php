@@ -29,6 +29,11 @@ $string['settings_maxima_url']           = 'goemaxima URL';
 $string['settings_maxima_url_desc']      = 'URL of the goemaxima service (within the Docker network).';
 $string['settings_max_retry']            = 'Max CAS validation retries';
 $string['settings_max_retry_desc']       = 'Maximum number of LLM re-generation attempts on CAS validation failure.';
+$string['settings_rag_heading']          = 'RAG settings (Step 6)';
+$string['settings_rag_enabled']          = 'Enable RAG search';
+$string['settings_rag_enabled_desc']     = 'Search the teacher-authored example corpus (qbank_stackgen_examples) and inject similar examples into the Stage 3/4 prompts. When disabled, generation proceeds without retrieval, as before.';
+$string['settings_rag_topk']             = 'RAG result count (top-k)';
+$string['settings_rag_topk_desc']        = 'Number of similar examples to inject into the prompt.';
 
 $string['status_pending']                = 'Pending';
 $string['status_ocr_done']               = 'OCR complete';

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="question/bank/stackgen/db" VERSION="20260708" COMMENT="XMLDB file for qbank_stackgen"
+<XMLDB PATH="question/bank/stackgen/db" VERSION="20260824" COMMENT="XMLDB file for qbank_stackgen"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd">
   <TABLES>
@@ -19,6 +19,7 @@
         <FIELD NAME="question_ids"           TYPE="text" NOTNULL="false" COMMENT="Stage6で問題バンクに登録されたquestion.idのJSON配列"/>
         <FIELD NAME="question_category_id"   TYPE="int"  LENGTH="10" NOTNULL="false" COMMENT="Stage6の登録先question_categories.id"/>
         <FIELD NAME="retry_count"  TYPE="int"  LENGTH="2"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="rag_examples_used" TYPE="text" NOTNULL="false" COMMENT="RAG検索でヒットしたqbank_stackgen_examples.idと類似度のJSON配列(トレーサビリティ・効果測定用)"/>
         <FIELD NAME="timecreated"  TYPE="int"  LENGTH="10" NOTNULL="true"/>
         <FIELD NAME="timemodified" TYPE="int"  LENGTH="10" NOTNULL="true"/>
       </FIELDS>
@@ -29,6 +30,26 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="status_idx" UNIQUE="false" FIELDS="status"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="qbank_stackgen_examples" COMMENT="RAG知識源: 教員手作りの良問コーパス(層A、fixtures/prt/questionsから取り込み)">
+      <FIELDS>
+        <FIELD NAME="id"          TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="sourcefile"  TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="fixtures/prt/questions配下の元ファイル名"/>
+        <FIELD NAME="category"    TYPE="char" LENGTH="60"  NOTNULL="false" COMMENT="integral/derivative等(index.json由来)"/>
+        <FIELD NAME="qtext"       TYPE="text" NOTNULL="true" COMMENT="埋め込み対象の問題文(qtext)"/>
+        <FIELD NAME="score"       TYPE="int"  LENGTH="5"  NOTNULL="false" COMMENT="build_fixtures.pyによるPRT作り込み度スコア"/>
+        <FIELD NAME="n_nodes"     TYPE="int"  LENGTH="5"  NOTNULL="false" COMMENT="PRTノード数(index.json由来、Stage4 Few-shot用)"/>
+        <FIELD NAME="distinct_tests"  TYPE="text" NOTNULL="false" COMMENT="使用Answer TestのJSON配列(index.json由来)"/>
+        <FIELD NAME="distinct_scores" TYPE="text" NOTNULL="false" COMMENT="truescoreの段階のJSON配列(index.json由来)"/>
+        <FIELD NAME="embedding"   TYPE="text" NOTNULL="true" COMMENT="Gemini embeddingsのfloat配列をJSON文字列で保存"/>
+        <FIELD NAME="timecreated" TYPE="int"  LENGTH="10" NOTNULL="true"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="sourcefile_idx" UNIQUE="true" FIELDS="sourcefile"/>
       </INDEXES>
     </TABLE>
   </TABLES>

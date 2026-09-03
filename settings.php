@@ -59,4 +59,25 @@ if ($ADMIN->fulltree) {
         '3',
         PARAM_INT
     ));
+
+    $settings->add(new admin_setting_heading(
+        'qbank_stackgen/ragheading',
+        get_string('settings_rag_heading', 'qbank_stackgen'),
+        ''
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'qbank_stackgen/rag_enabled',
+        get_string('settings_rag_enabled', 'qbank_stackgen'),
+        get_string('settings_rag_enabled_desc', 'qbank_stackgen'),
+        '1'
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'qbank_stackgen/rag_topk',
+        get_string('settings_rag_topk', 'qbank_stackgen'),
+        get_string('settings_rag_topk_desc', 'qbank_stackgen'),
+        '3',
+        PARAM_INT
+    ));
 }
