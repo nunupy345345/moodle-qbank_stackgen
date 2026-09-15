@@ -15,6 +15,14 @@ $string['upload_success']                = 'Image received. Processing in the ba
 $string['upload_error_nofile']           = 'Please select an image file.';
 $string['upload_error_invalid']          = 'Invalid file format. Please select JPEG, PNG, or WebP.';
 $string['upload_processing']             = 'Processing in the background. Please wait.';
+$string['upload_folder_heading']         = 'Bulk upload from a folder';
+$string['upload_folder_label']           = 'Select an image folder (all images in it will be queued)';
+$string['upload_folder_submit']          = 'Upload folder contents';
+
+// Job list filter.
+$string['filter_status_label']           = 'Filter by status';
+$string['filter_status_all']             = 'All';
+$string['filter_no_results']             = 'No jobs match this filter.';
 
 $string['settings_api_heading']          = 'API settings';
 $string['settings_google_api_key']       = 'Google API key (Gemini)';
@@ -55,9 +63,13 @@ $string['ocr_question_text']             = 'Question text';
 $string['ocr_question_type']             = 'Question type';
 $string['ocr_problem_expression']        = 'Expression (LaTeX)';
 $string['ocr_answer_expression']         = 'Answer (LaTeX)';
+$string['rag_examples_heading']          = 'Referenced similar examples (RAG)';
+$string['rag_similarity_label']          = 'similarity';
 $string['retry_button']                  = 'Retry';
 $string['retry_count_label']             = 'Retry attempt {$a}';
 $string['retry_success']                 = 'Queued for retry. It will be processed automatically shortly.';
+$string['retry_stage3_button']           = 'Restart from Stage 3 (edit wrong answers)';
+$string['retry_stage3_success']          = 'Reopened the wrong-answer review form. Please review, edit, and confirm again.';
 $string['review_link']                   = 'Review wrong answers & feedback';
 
 // Review page (Stage 3).

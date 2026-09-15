@@ -17,6 +17,14 @@ $string['upload_success']                = '画像を受け付けました。バ
 $string['upload_error_nofile']           = '画像ファイルを選択してください。';
 $string['upload_error_invalid']          = '無効なファイル形式です。JPEG / PNG / WebP を選択してください。';
 $string['upload_processing']             = 'バックグラウンドで処理中です。しばらくお待ちください。';
+$string['upload_folder_heading']         = 'フォルダから一括アップロード';
+$string['upload_folder_label']           = '画像フォルダを選択（フォルダ内の画像をまとめて処理します）';
+$string['upload_folder_submit']          = 'フォルダの内容をアップロード';
+
+// Job list filter.
+$string['filter_status_label']           = 'ステータスで絞り込み';
+$string['filter_status_all']             = 'すべて';
+$string['filter_no_results']             = '該当するジョブがありません。';
 
 // Settings.
 $string['settings_api_heading']          = 'API設定';
@@ -59,9 +67,13 @@ $string['ocr_question_text']             = '問題文';
 $string['ocr_question_type']             = '問題タイプ';
 $string['ocr_problem_expression']        = '数式（LaTeX）';
 $string['ocr_answer_expression']         = '答え（LaTeX）';
+$string['rag_examples_heading']          = '参考にした類似問題（RAG）';
+$string['rag_similarity_label']          = '類似度';
 $string['retry_button']                  = '再実行';
 $string['retry_count_label']             = '再試行{$a}回目';
 $string['retry_success']                 = '再実行キューに登録しました。しばらくすると自動的に処理されます。';
+$string['retry_stage3_button']           = 'Stage3からやり直す（誤答例を編集）';
+$string['retry_stage3_success']          = '誤答例の編集画面に戻しました。内容を確認・修正して再度確定してください。';
 $string['review_link']                   = '誤答例・フィードバックをレビューする';
 
 // Review page (Stage 3).

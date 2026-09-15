@@ -9,10 +9,11 @@
 
     Context variables:
       - id, status, statuslabel, statusclass, timecreated
-      - hasocr, problems[]
+      - hasocr, problems[]（各要素に has_rag_examples, rag_examples[] を含む。Step 6 RAGで
+        参照した教員手作りコーパスの類似問題トレーサビリティ表示用）
       - hasxml, xml_questions[], xml_count, xml_raw
       - haserror, error_msg
-      - canretry, retry_count
+      - canretry, canretrystage3, retry_count
       - canreview, reviewproblems[], hasreviewproblems
       - awaitingxml, autoprocessing, polling
       - isapproved, bankurl
@@ -51,6 +52,16 @@
                     <div class="mt-1">\( {{answer_expression}} \)</div>
                 </dd>
                 {{/ has_answer }}
+                {{# has_rag_examples }}
+                <dt class="col-sm-3">{{# str }} rag_examples_heading, qbank_stackgen {{/ str }}</dt>
+                <dd class="col-sm-9">
+                    <ul class="mb-0 pl-3 text-muted">
+                        {{# rag_examples }}
+                        <li>{{sourcefile}}（{{# str }} rag_similarity_label, qbank_stackgen {{/ str }} {{similarity_pct}}%・{{category}}）</li>
+                        {{/ rag_examples }}
+                    </ul>
+                </dd>
+                {{/ has_rag_examples }}
             </dl>
         </div>
         {{/ problems }}
@@ -144,6 +155,16 @@
                             <div class="mt-1">\( {{answer_expression}} \)</div>
                         </dd>
                         {{/ has_answer }}
+                        {{# has_rag_examples }}
+                        <dt class="col-sm-2">{{# str }} rag_examples_heading, qbank_stackgen {{/ str }}</dt>
+                        <dd class="col-sm-10">
+                            <ul class="mb-0 pl-3 small text-muted">
+                                {{# rag_examples }}
+                                <li>{{sourcefile}}（{{# str }} rag_similarity_label, qbank_stackgen {{/ str }} {{similarity_pct}}%・{{category}}）</li>
+                                {{/ rag_examples }}
+                            </ul>
+                        </dd>
+                        {{/ has_rag_examples }}
                     </dl>
 
                     <h4 class="h6">{{# str }} review_wronganswers_heading, qbank_stackgen {{/ str }}</h4>
@@ -219,6 +240,17 @@
             <small class="text-muted ml-2">{{# str }} retry_count_label, qbank_stackgen, {{retry_count}} {{/ str }}</small>
             {{/ retry_count }}
         </form>
+        {{# canretrystage3 }}
+        <form method="post" action="{{actionurl}}" class="d-inline">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <input type="hidden" name="courseid" value="{{courseid}}">
+            <input type="hidden" name="action" value="retry_stage3">
+            <input type="hidden" name="jobid" value="{{id}}">
+            <button type="submit" class="btn btn-sm btn-outline-warning ml-2">
+                {{# str }} retry_stage3_button, qbank_stackgen {{/ str }}
+            </button>
+        </form>
+        {{/ canretrystage3 }}
     </div>
     {{/ canretry }}
 </div>

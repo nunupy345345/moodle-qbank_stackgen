@@ -19,7 +19,10 @@ class maxima_validator {
     private const VERSION = '2026042200';
 
     // 方程式（lhs=rhs）と素の式のどちらでも同じように比較できるようにする正規化関数。
-    private const NORM_FUNC = 'stackgen_norm(e):=if op(e)="=" then lhs(e)-rhs(e) else e$';
+    // ta/waNがLLMによって「6」「3」のような単純な数値（Maximaのアトム）として生成された場合、
+    // op(e)はアトムに対してエラーになる（例: stackgen_norm(e=6) -- an error.）ため、
+    // atom(e)チェックでガードしてから演算子判定する。
+    private const NORM_FUNC = 'stackgen_norm(e):=if atom(e) then e else (if op(e)="=" then lhs(e)-rhs(e) else e)$';
 
     private const ERROR_MARKERS = ['syntax error', 'incorrect syntax', '-- an error.'];
 
@@ -68,7 +71,7 @@ class maxima_validator {
 
         if (empty($wanames)) {
             // 誤答例なし: ta単体の構文チェックのみ。
-            $response = $this->call_goemaxima("{$qvtext} ta;");
+            $response = $this->call_goemaxima_with_retry("{$qvtext} ta;");
             if ($this->looks_like_error($response)) {
                 $errors[] = "問題{$qnum}: ta の構文エラー: " . $this->extract_error_detail($response);
             }
@@ -78,7 +81,7 @@ class maxima_validator {
         foreach ($wanames as $waname) {
             $input = self::NORM_FUNC . " {$qvtext} "
                 . "is(ratsimp(stackgen_norm(ta)-stackgen_norm({$waname}))=0);";
-            $response = $this->call_goemaxima($input);
+            $response = $this->call_goemaxima_with_retry($input);
 
             if ($this->looks_like_error($response)) {
                 $errors[] = "問題{$qnum}: ta / {$waname} の構文エラー: " . $this->extract_error_detail($response);
@@ -94,6 +97,23 @@ class maxima_validator {
         }
 
         return $errors;
+    }
+
+    /**
+     * goemaximaは短時間に連続でリクエストを送るとワーカーの使い回し起因と見られる不安定な
+     * エラー応答（本来アトム値のはずの単純な数値・記号に対してop()がエラーになる等、手動で
+     * 同一入力を単発送信すると再現しない）を稀に返すことが実機検証で確認された。
+     * 内容自体の構文エラーであれば再送しても同じ結果になるだけなので、一度だけ再送して
+     * 一時的な不安定性を吸収する（本当の構文エラーを見逃すリスクはない）。
+     */
+    private function call_goemaxima_with_retry(string $input, int $retries = 1): string {
+        $response = $this->call_goemaxima($input);
+        while ($this->looks_like_error($response) && $retries > 0) {
+            $retries--;
+            usleep(300000);
+            $response = $this->call_goemaxima($input);
+        }
+        return $response;
     }
 
     private function looks_like_error(string $response): bool {
@@ -119,16 +139,28 @@ class maxima_validator {
     /**
      * エラー発生時の詳細メッセージ抽出。構文エラー等は (%oN) ラベルを伴わずに出力されるため、
      * extract_last_result() で拾うと無関係な直前の結果を誤って掴むことがある。
-     * ここではエラーマーカーを含む行そのものを抜き出す。
+     * ここではエラーマーカーを含む行を抜き出すが、Maximaのエラーは通常
+     * 「具体的な説明（例: op: operand must not be atom...）」→「-- an error. To debug...」
+     * という2行構成で出力されるため、マーカー行だけを拾うと肝心の説明文が失われる。
+     * そのため直前の空行でない1行も文脈として含める。
      */
     private function extract_error_detail(string $response): string {
         $lines = preg_split('/\r?\n/', $response);
         $matched = [];
-        foreach ($lines as $line) {
+        foreach ($lines as $i => $line) {
             $lower = mb_strtolower($line);
             foreach (self::ERROR_MARKERS as $marker) {
                 if (strpos($lower, mb_strtolower($marker)) !== false) {
-                    $matched[] = trim($line);
+                    $detail = trim($line);
+                    for ($j = $i - 1; $j >= 0; $j--) {
+                        $prev = trim($lines[$j]);
+                        if ($prev === '') {
+                            continue;
+                        }
+                        $detail = "{$prev} {$detail}";
+                        break;
+                    }
+                    $matched[] = $detail;
                     break;
                 }
             }

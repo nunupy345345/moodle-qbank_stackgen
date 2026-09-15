@@ -119,6 +119,10 @@ function qbank_stackgen_export_job(stdClass $job, string $outdir): void {
     file_put_contents($jobdir . '/input.json', json_encode([
         'ocr_result'         => json_decode($job->ocr_result ?: '{}', true),
         'feedback_confirmed' => json_decode($job->feedback_confirmed ?: '{}', true),
+        // Step 6 RAG: 問題インデックス順の配列。各要素は検索でヒットした例（id/sourcefile/category/
+        // qtext/score/n_nodes/distinct_tests/distinct_scores/similarity）のtop-kリスト（空配列もありうる）。
+        // RAG無効時や検索失敗時も要素自体は空配列で残るため、有効/無効の判別にも使える。
+        'rag_examples_used'  => json_decode($job->rag_examples_used ?? '', true) ?: [],
     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
     if (!empty($job->xml_result)) {

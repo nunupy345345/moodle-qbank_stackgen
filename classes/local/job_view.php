@@ -65,6 +65,32 @@ class job_view {
     }
 
     /**
+     * Step 6 RAG: qbank_stackgen_jobs.rag_examples_used（問題インデックス順のtop-k検索結果）から、
+     * 指定した問題インデックス分だけをテンプレート表示用に整形する。
+     * RAG無効・検索失敗・該当インデックスなしのいずれでも空配列を返す（呼び出し側でhasフラグを立てるだけでよい）。
+     *
+     * @param array $ragresults job->rag_examples_used をデコードした配列（rag_search::search()の結果のリストのリスト）
+     * @param int   $index      問題インデックス（0始まり）
+     * @return array [['sourcefile'=>string, 'category'=>string, 'similarity_pct'=>string], ...]
+     */
+    private static function format_rag_examples(array $ragresults, int $index): array {
+        $entries = $ragresults[$index] ?? [];
+        if (!is_array($entries)) {
+            return [];
+        }
+
+        $formatted = [];
+        foreach ($entries as $e) {
+            $formatted[] = [
+                'sourcefile'     => $e['sourcefile'] ?? '',
+                'category'       => $e['category'] ?? '',
+                'similarity_pct' => number_format((float)($e['similarity'] ?? 0) * 100, 1),
+            ];
+        }
+        return $formatted;
+    }
+
+    /**
      * job_card.mustache（テンプレート）が必要とする全フィールドを1ジョブ分組み立てる。
      *
      * @param \stdClass $job          qbank_stackgen_jobs の1レコード
@@ -73,21 +99,28 @@ class job_view {
      * @return array
      */
     public static function build(\stdClass $job, int $courseid, string $sesskey): array {
+        // Step 6 RAG: 問題インデックス順のtop-k検索結果。$problems組み立て時に元のOCR順インデックスで
+        // 引き当てるため、continueでスキップする問題があってもズレないよう先にデコードしておく。
+        $ragresults = json_decode($job->rag_examples_used ?? '', true) ?: [];
+
         $problems = [];
         if (!empty($job->ocr_result)) {
             $ocr = json_decode($job->ocr_result, true);
             // 新形式: {"problems": [...]}、旧形式（単一問題）の後方互換も維持
             $rawproblems = isset($ocr['problems']) ? $ocr['problems'] : [$ocr];
-            foreach ($rawproblems as $p) {
+            foreach ($rawproblems as $i => $p) {
                 if (empty($p['problem_expression'])) {
                     continue;
                 }
+                $ragexamples = self::format_rag_examples($ragresults, $i);
                 $problems[] = [
                     'question_text'      => $p['question_text'] ?? '',
                     'question_type'      => $p['question_type'] ?? '',
                     'problem_expression' => $p['problem_expression'] ?? '',
                     'answer_expression'  => $p['answer_expression'] ?? null,
                     'has_answer'         => !empty($p['answer_expression']),
+                    'rag_examples'       => $ragexamples,
+                    'has_rag_examples'   => !empty($ragexamples),
                 ];
             }
         }
@@ -134,6 +167,7 @@ class job_view {
                     ];
                 }
 
+                $ragexamples = self::format_rag_examples($ragresults, $i);
                 $reviewproblems[] = [
                     'index'              => $i,
                     'displaynum'         => $i + 1,
@@ -143,6 +177,8 @@ class job_view {
                     'problem_expression' => $p['problem_expression'] ?? '',
                     'answer_expression'  => $p['answer_expression'] ?? null,
                     'has_answer'         => !empty($p['answer_expression']),
+                    'rag_examples'       => $ragexamples,
+                    'has_rag_examples'   => !empty($ragexamples),
                     'wronganswers'       => $wronganswers,
                 ];
             }
@@ -177,6 +213,11 @@ class job_view {
             'haserror'           => !empty($job->error_msg),
             'error_msg'          => $job->error_msg ?? '',
             'canretry'           => in_array($job->status, self::retryable_statuses(), true),
+            // Stage4以降で失敗を繰り返す場合、確定済みの誤答例自体（feedback_confirmed）が原因のことが
+            // 多い（例: 正答と数式的に同値な誤答例）。Stage3のレビュー編集画面を出し直せるようにする。
+            // feedback_resultがなければStage3自体がまだ実行されていないので出さない。
+            'canretrystage3'     => in_array($job->status, self::retryable_statuses(), true)
+                && !empty($job->feedback_result),
             'retry_count'        => $job->retry_count,
             'canreview'          => $needsreview,
             'reviewproblems'     => $reviewproblems,

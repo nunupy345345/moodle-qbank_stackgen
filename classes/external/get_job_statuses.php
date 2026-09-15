@@ -43,7 +43,7 @@ class get_job_statuses extends external_api {
             [$courseid, $USER->id],
             'id DESC',
             'id, status, ocr_result, feedback_result, feedback_confirmed, xml_result, error_msg, ' .
-                'question_category_id, retry_count, timecreated',
+                'question_category_id, retry_count, timecreated, rag_examples_used',
             0, 1
         );
 
@@ -57,12 +57,24 @@ class get_job_statuses extends external_api {
     }
 
     public static function execute_returns(): external_multiple_structure {
+        // Step 6 RAG: このジョブの生成時に参照した教員手作りコーパスの類似問題（トレーサビリティ表示用）。
+        $ragexamplestructure = [
+            'sourcefile'     => new external_value(PARAM_RAW, 'Corpus source filename'),
+            'category'       => new external_value(PARAM_RAW, 'Corpus example category'),
+            'similarity_pct' => new external_value(PARAM_RAW, 'Cosine similarity, formatted as a percentage'),
+        ];
+
         $problemstructure = [
             'question_text'      => new external_value(PARAM_RAW, 'Question text'),
             'question_type'      => new external_value(PARAM_RAW, 'Question type'),
             'problem_expression' => new external_value(PARAM_RAW, 'Problem expression (LaTeX)'),
             'answer_expression'  => new external_value(PARAM_RAW, 'Answer expression (LaTeX)', VALUE_OPTIONAL, null, NULL_ALLOWED),
             'has_answer'         => new external_value(PARAM_BOOL, 'Whether an answer expression is present'),
+            'rag_examples'       => new external_multiple_structure(
+                new external_single_structure($ragexamplestructure),
+                'RAG: similar corpus examples used for this problem', VALUE_DEFAULT, []
+            ),
+            'has_rag_examples'   => new external_value(PARAM_BOOL, 'Whether any RAG examples were used', VALUE_DEFAULT, false),
         ];
 
         $wronganswerstructure = [

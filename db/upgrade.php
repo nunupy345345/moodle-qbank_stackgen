@@ -73,5 +73,21 @@ function xmldb_qbank_stackgen_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026082400, 'qbank', 'stackgen');
     }
 
+    if ($oldversion < 2026083100) {
+        $table = new xmldb_table('qbank_stackgen_jobs');
+
+        $field = new xmldb_field('sourcefilename', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'rag_examples_used');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        $index = new xmldb_index('courseid_sourcefilename_idx', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'sourcefilename']);
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+
+        upgrade_plugin_savepoint(true, 2026083100, 'qbank', 'stackgen');
+    }
+
     return true;
 }

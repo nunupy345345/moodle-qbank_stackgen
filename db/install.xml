@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="question/bank/stackgen/db" VERSION="20260824" COMMENT="XMLDB file for qbank_stackgen"
+<XMLDB PATH="question/bank/stackgen/db" VERSION="20260831" COMMENT="XMLDB file for qbank_stackgen"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd">
   <TABLES>
@@ -20,6 +20,7 @@
         <FIELD NAME="question_category_id"   TYPE="int"  LENGTH="10" NOTNULL="false" COMMENT="Stage6の登録先question_categories.id"/>
         <FIELD NAME="retry_count"  TYPE="int"  LENGTH="2"  NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="rag_examples_used" TYPE="text" NOTNULL="false" COMMENT="RAG検索でヒットしたqbank_stackgen_examples.idと類似度のJSON配列(トレーサビリティ・効果測定用)"/>
+        <FIELD NAME="sourcefilename" TYPE="char" LENGTH="255" NOTNULL="false" COMMENT="cli/bulk_import.phpでフォルダから一括投入した場合の元ファイル名(重複投入防止用。ブラウザアップロード分はNULL)"/>
         <FIELD NAME="timecreated"  TYPE="int"  LENGTH="10" NOTNULL="true"/>
         <FIELD NAME="timemodified" TYPE="int"  LENGTH="10" NOTNULL="true"/>
       </FIELDS>
@@ -30,6 +31,7 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="status_idx" UNIQUE="false" FIELDS="status"/>
+        <INDEX NAME="courseid_sourcefilename_idx" UNIQUE="false" FIELDS="courseid, sourcefilename"/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="qbank_stackgen_examples" COMMENT="RAG知識源: 教員手作りの良問コーパス(層A、fixtures/prt/questionsから取り込み)">

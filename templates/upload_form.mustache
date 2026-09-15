@@ -1,14 +1,19 @@
 {{!
     Template: qbank_stackgen/upload_form
     Context variables:
-      - actionurl: form action URL
-      - sesskey:   Moodle session key
-      - courseid:  course id
-      - formid:    HTML id of the form element
-      - jobs:      array of recent job objects
-      - hasjobs:   boolean
-      - pagingbar: rendered HTML of the paging nav (upload.php builds this manually;
-                   page 0 has 1 item, page >=1 has 10 each, so core paging_bar can't be reused)
+      - actionurl:     form action URL
+      - sesskey:       Moodle session key
+      - courseid:      course id
+      - formid:        HTML id of the form element
+      - jobs:          array of recent job objects (current page/filter)
+      - hasjobs:       boolean (jobs is non-empty)
+      - showjoblist:   boolean (this user has at least one job ever, regardless of filter;
+                       controls whether the whole job-list section + filter UI is shown)
+      - statusoptions: array of {value: full URL incl. status param, label, selected} for the
+                       status filter <select> (amd/src/upload.js navigates to option.value on change)
+      - pagingbar:     rendered HTML of the paging nav (upload.php builds this manually;
+                       unfiltered page 0 has 1 item, page >=1 has 10 each, so core paging_bar
+                       can't be reused; filtered view uses a plain 10-per-page pager)
 }}
 <div class="qbank-stackgen-upload">
     <h2>{{# str }} upload_page_title, qbank_stackgen {{/ str }}</h2>
@@ -40,14 +45,51 @@
             {{# str }} upload_submit, qbank_stackgen {{/ str }}
         </button>
     </form>
+
+    <hr class="my-4">
+
+    <h3 class="h5">{{# str }} upload_folder_heading, qbank_stackgen {{/ str }}</h3>
+    <div class="form-group mb-3">
+        <label for="stackgen-folder-input" class="form-label">
+            {{# str }} upload_folder_label, qbank_stackgen {{/ str }}
+        </label>
+        <input type="file"
+               id="stackgen-folder-input"
+               class="form-control"
+               webkitdirectory
+               directory
+               multiple>
+    </div>
+    <button type="button" id="stackgen-folder-submit" class="btn btn-secondary" disabled>
+        {{# str }} upload_folder_submit, qbank_stackgen {{/ str }}
+    </button>
+    <div id="stackgen-folder-progress" class="mt-2 small text-muted" style="display:none;"></div>
 </div>
 
-{{# hasjobs }}
+{{# showjoblist }}
 <div class="qbank-stackgen-jobs mt-4">
-    <h3>{{# str }} job_list_heading, qbank_stackgen {{/ str }}</h3>
+    <div class="d-flex justify-content-between align-items-center flex-wrap mb-2">
+        <h3 class="mb-0">{{# str }} job_list_heading, qbank_stackgen {{/ str }}</h3>
+        <div class="form-inline">
+            <label for="stackgen-status-filter" class="mr-2 mb-0 small">
+                {{# str }} filter_status_label, qbank_stackgen {{/ str }}
+            </label>
+            <select id="stackgen-status-filter" class="form-control form-control-sm">
+                {{# statusoptions }}
+                <option value="{{value}}" {{# selected }}selected{{/ selected }}>{{label}}</option>
+                {{/ statusoptions }}
+            </select>
+        </div>
+    </div>
+
     {{# jobs }}
     {{> qbank_stackgen/job_card }}
     {{/ jobs }}
+
+    {{^ hasjobs }}
+    <p class="text-muted">{{# str }} filter_no_results, qbank_stackgen {{/ str }}</p>
+    {{/ hasjobs }}
+
     {{{ pagingbar }}}
 </div>
-{{/ hasjobs }}
+{{/ showjoblist }}

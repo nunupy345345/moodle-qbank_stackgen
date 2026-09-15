@@ -26,18 +26,24 @@ $PAGE->set_heading($course->fullname);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_sesskey();
 
-    $action = optional_param('action', 'upload', PARAM_ALPHA);
+    // retry_stage3のようにアンダースコア・数字を含む値があるため、英字のみのPARAM_ALPHAは使えない。
+    $action = optional_param('action', 'upload', PARAM_ALPHANUMEXT);
 
     if ($action === 'retry') {
         $jobid = required_param('jobid', PARAM_INT);
         $job = $DB->get_record('qbank_stackgen_jobs',
             ['id' => $jobid, 'courseid' => $courseid, 'userid' => $USER->id], '*', MUST_EXIST);
 
-        // xml_result があれば llm_done から（Stage6の問題バンク登録だけ再実行）、
-        // feedback_confirmed があれば feedback_pending から（Stage4のみ再実行）、
-        // ocr_result のみあれば ocr_done から（Stage3からやり直し）、
-        // どちらもなければ pending から（OCRごとやり直し）。
-        if (!empty($job->xml_result)) {
+        // Stage6（問題バンク登録）だけが失敗した場合に限り、xml_resultは既にCAS検証済みとみなして
+        // llm_done から（Stage6だけ再実行）。それ以外（Stage4のLLM生成エラーやStage5のCAS検証失敗）は
+        // xml_resultが残っていても「検証済みで安全なXML」とは限らないため、feedback_confirmedがあれば
+        // feedback_pending から（Stage4のXML生成・Stage5のCAS検証からやり直す）。
+        // これを区別せず「xml_resultがあれば無条件にllm_doneへ」としていると、CAS検証に失敗したままの
+        // XMLが再検証されずにそのまま問題バンクへ登録されてしまう事故につながる。
+        $stage6only = !empty($job->xml_result) && !empty($job->error_msg)
+            && strpos($job->error_msg, 'Stage6') === 0;
+
+        if ($stage6only) {
             $resumestatus = 'llm_done';
         } else if (!empty($job->feedback_confirmed)) {
             $resumestatus = 'feedback_pending';
@@ -66,7 +72,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
     }
 
-    $image_b64 = optional_param('image_b64', '', PARAM_RAW);
+    if ($action === 'retry_stage3') {
+        // Stage4以降で繰り返し失敗する場合、確定済みの誤答例（feedback_confirmed）自体に
+        // 問題があることが多い（例: taと数式的に同値な誤答例）。feedback_confirmedを空に戻し、
+        // 既存のfeedback_result（Stage3のAI提案）を使ってレビュー編集画面を再度開けるようにする。
+        // Adhoc Taskはここではキューしない（review.php側で確定時にキューされる）。
+        $jobid = required_param('jobid', PARAM_INT);
+        $job = $DB->get_record('qbank_stackgen_jobs',
+            ['id' => $jobid, 'courseid' => $courseid, 'userid' => $USER->id], '*', MUST_EXIST);
+
+        $DB->update_record('qbank_stackgen_jobs', (object)[
+            'id'                 => $jobid,
+            'status'             => 'feedback_pending',
+            'feedback_confirmed' => null,
+            'xml_result'         => null,
+            'llm_cot'            => null,
+            'error_msg'          => null,
+            'retry_count'        => 0,
+            'timemodified'       => time(),
+        ]);
+
+        redirect(
+            new moodle_url('/question/bank/stackgen/upload.php', ['courseid' => $courseid]),
+            get_string('retry_stage3_success', 'qbank_stackgen'),
+            null,
+            \core\output\notification::NOTIFY_SUCCESS
+        );
+    }
+
+    $image_b64      = optional_param('image_b64', '', PARAM_RAW);
+    // フォルダ一括アップロード（amd/src/upload.jsのfetch経由）から送られる元ファイル名。
+    // 単発アップロードのフォームには存在しないため、送られなければNULLのまま(重複チェックはしない)。
+    $sourcefilename = optional_param('sourcefilename', '', PARAM_FILE) ?: null;
 
     if (empty($image_b64)) {
         redirect(
@@ -80,13 +117,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Insert job record.
     $now   = time();
     $jobid = $DB->insert_record('qbank_stackgen_jobs', (object)[
-        'courseid'     => $courseid,
-        'userid'       => $USER->id,
-        'status'       => 'pending',
-        'image_b64'    => $image_b64,
-        'retry_count'  => 0,
-        'timecreated'  => $now,
-        'timemodified' => $now,
+        'courseid'       => $courseid,
+        'userid'         => $USER->id,
+        'status'         => 'pending',
+        'image_b64'      => $image_b64,
+        'sourcefilename' => $sourcefilename,
+        'retry_count'    => 0,
+        'timecreated'    => $now,
+        'timemodified'   => $now,
     ]);
 
     // Queue Adhoc Task.
@@ -103,29 +141,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Render upload form.
-// ページ構成: 1ページ目（page=0）は最新1件のみ、2ページ目以降（page>=1）は残りを10件ずつページングする。
-// そのため件数がページによって違い、Moodle標準の paging_bar（全ページ同じperpage前提）はそのまま使えない。
+// ページ構成: フィルタなし(status='')のときだけ、1ページ目（page=0）は最新1件・2ページ目以降は
+// 10件ずつという不均等な構成にする。ステータスで絞り込んだ場合は「最新1件だけ特別扱い」という
+// 前提が意味をなさないため、1ページ目から10件ずつの通常ページングに切り替える。
 $page    = optional_param('page', 0, PARAM_INT);
+$status  = optional_param('status', '', PARAM_ALPHA);
 $perpage = 10;
 
 $PAGE->requires->js_call_amd('qbank_stackgen/upload', 'init', ['stackgen-upload-form']);
 $PAGE->requires->js_call_amd('qbank_stackgen/job_review', 'init');
-// ポーリングは1ページ目（最新1件）だけが対象。過去ページの古いジョブはもう状態が変わらないので
-// ポーリングさせない（get_job_statuses も常に最新1件しか返さないため、2ページ目以降で回しても無意味）。
-if ($page === 0) {
+// ポーリングは「フィルタなしの1ページ目（＝最新1件）」だけが対象。絞り込み表示や過去ページの
+// ジョブはもう状態が変わらない（レビュー待ちで教員操作待ちのものが大半）ので、
+// ポーリングさせない（get_job_statuses も常に最新1件しか返さないため、他のページで回しても無意味）。
+if ($page === 0 && $status === '') {
     $PAGE->requires->js_call_amd('qbank_stackgen/status_poll', 'init', [$courseid]);
 }
 
 echo $OUTPUT->header();
 
-// Fetch jobs for this user in this course, newest first, paged.
-$totalcount = $DB->count_records_select(
+// このユーザー・このコースのジョブが1件でもあれば、絞り込みが空振りでも一覧セクション自体
+// （フィルタUI含む）は表示する。
+$totalcountall = $DB->count_records_select(
     'qbank_stackgen_jobs',
     'courseid = ? AND userid = ?',
     [$courseid, $USER->id]
 );
 
-if ($page <= 0) {
+$where  = 'courseid = ? AND userid = ?';
+$params = [$courseid, $USER->id];
+if ($status !== '') {
+    $where    .= ' AND status = ?';
+    $params[]  = $status;
+}
+
+$totalcount = $DB->count_records_select('qbank_stackgen_jobs', $where, $params);
+
+if ($status !== '') {
+    $limitfrom = $page * $perpage;
+    $limitnum  = $perpage;
+} else if ($page <= 0) {
     $limitfrom = 0;
     $limitnum  = 1;
 } else {
@@ -135,11 +189,11 @@ if ($page <= 0) {
 
 $dbjobs = $DB->get_records_select(
     'qbank_stackgen_jobs',
-    'courseid = ? AND userid = ?',
-    [$courseid, $USER->id],
+    $where,
+    $params,
     'id DESC',
     'id, status, ocr_result, feedback_result, feedback_confirmed, xml_result, error_msg, ' .
-        'question_category_id, retry_count, timecreated',
+        'question_category_id, retry_count, timecreated, rag_examples_used',
     $limitfrom, $limitnum
 );
 
@@ -149,28 +203,53 @@ foreach ($dbjobs as $job) {
     $jobs[] = \qbank_stackgen\local\job_view::build($job, $courseid, $sesskey);
 }
 
-// 1ページ目=1件、2ページ目以降=10件という不均等な構成なので、独自の簡易ページャーを組み立てる
-// （$OUTPUT->paging_bar は全ページ同じperpage前提のため、この構成には使えない）。
-$remaining  = max(0, $totalcount - 1);
-$extrapages = (int)ceil($remaining / $perpage);
-$totalpages = 1 + $extrapages;
+if ($status !== '') {
+    $totalpages = max(1, (int)ceil($totalcount / $perpage));
+} else {
+    // 1ページ目=1件、2ページ目以降=10件という不均等な構成なので、独自の簡易ページャーを組み立てる
+    // （$OUTPUT->paging_bar は全ページ同じperpage前提のため、この構成には使えない）。
+    $remaining  = max(0, $totalcount - 1);
+    $extrapages = (int)ceil($remaining / $perpage);
+    $totalpages = 1 + $extrapages;
+}
 
 $pagingbar = '';
 if ($totalpages > 1) {
     $links = [];
     for ($p = 0; $p < $totalpages; $p++) {
         $label = (string)($p + 1);
+        $pageurlparams = ['page' => $p];
+        if ($status !== '') {
+            $pageurlparams['status'] = $status;
+        }
         if ($p === $page) {
             $links[] = html_writer::span($label, 'font-weight-bold px-2');
         } else {
             $links[] = html_writer::link(
-                new moodle_url($PAGE->url, ['page' => $p]), $label, ['class' => 'px-2']
+                new moodle_url($PAGE->url, $pageurlparams), $label, ['class' => 'px-2']
             );
         }
     }
     $pagingbar = html_writer::tag(
         'nav', implode(' ', $links), ['class' => 'stackgen-paging mt-2', 'aria-label' => 'job list paging']
     );
+}
+
+// ステータス絞り込みドロップダウン。値はJSがそのままlocation.hrefに使う完全なURL
+// （courseid+status付き）にしておき、courseidをJS側に渡す必要をなくす。
+$statusoptions   = [];
+$statusoptions[] = [
+    'value'    => (new moodle_url('/question/bank/stackgen/upload.php', ['courseid' => $courseid]))->out(false),
+    'label'    => get_string('filter_status_all', 'qbank_stackgen'),
+    'selected' => $status === '',
+];
+foreach (\qbank_stackgen\local\job_view::status_labels() as $key => $label) {
+    $statusoptions[] = [
+        'value'    => (new moodle_url('/question/bank/stackgen/upload.php',
+            ['courseid' => $courseid, 'status' => $key]))->out(false),
+        'label'    => $label,
+        'selected' => $status === $key,
+    ];
 }
 
 // Trigger MathJax re-typeset after DOM is ready.
@@ -190,13 +269,15 @@ require(["core/first"], function() {
 }
 
 $templatecontext = [
-    'actionurl' => (new moodle_url('/question/bank/stackgen/upload.php'))->out(false),
-    'sesskey'   => sesskey(),
-    'courseid'  => $courseid,
-    'formid'    => 'stackgen-upload-form',
-    'jobs'      => $jobs,
-    'hasjobs'   => !empty($jobs),
-    'pagingbar' => $pagingbar,
+    'actionurl'     => (new moodle_url('/question/bank/stackgen/upload.php'))->out(false),
+    'sesskey'       => sesskey(),
+    'courseid'      => $courseid,
+    'formid'        => 'stackgen-upload-form',
+    'jobs'          => $jobs,
+    'hasjobs'       => !empty($jobs),
+    'showjoblist'   => $totalcountall > 0,
+    'statusoptions' => $statusoptions,
+    'pagingbar'     => $pagingbar,
 ];
 
 echo $OUTPUT->render_from_template('qbank_stackgen/upload_form', $templatecontext);
