@@ -1,0 +1,195 @@
+{{!
+    Template: qbank_stackgen/kc_job_card
+
+    1ジョブ分のKC診断版カード。qbank_stackgen\local\kc_job_view::build() が返す配列と
+    1:1で対応する。kc_job_list.mustache のループからパーシャルとして呼ばれるほか、
+    amd/src/kc_status_poll.js から Templates.renderForPromise() 経由で単独レンダリングもされる。
+}}
+<div class="card mb-3" data-jobid="{{id}}" data-kc-status="{{kc_status}}"{{# polling }} data-kc-polling="1"{{/ polling }}>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="font-weight-bold">ジョブ #{{id}}（{{problemcount}}問）</span>
+        <span class="badge badge-{{statusclass}} px-2 py-1">{{statuslabel}}</span>
+    </div>
+    <div class="card-body">
+        {{# hasocrsummary }}
+        <div class="stackgen-kc-ocr-summary mb-3">
+            {{# ocrsummary }}
+            <dl class="row mb-2 small border-bottom pb-2">
+                <dt class="col-sm-2">{{# str }} ocr_question_text, qbank_stackgen {{/ str }}</dt>
+                <dd class="col-sm-10">{{question_text}}</dd>
+                <dt class="col-sm-2">{{# str }} ocr_question_type, qbank_stackgen {{/ str }}</dt>
+                <dd class="col-sm-10"><code>{{question_type}}</code></dd>
+                <dt class="col-sm-2">{{# str }} ocr_problem_expression, qbank_stackgen {{/ str }}</dt>
+                <dd class="col-sm-10">
+                    <code>{{problem_expression}}</code>
+                    <div class="mt-1">\( {{problem_expression}} \)</div>
+                </dd>
+                {{# has_answer }}
+                <dt class="col-sm-2">{{# str }} ocr_answer_expression, qbank_stackgen {{/ str }}</dt>
+                <dd class="col-sm-10">
+                    <code>{{answer_expression}}</code>
+                    <div class="mt-1">\( {{answer_expression}} \)</div>
+                </dd>
+                {{/ has_answer }}
+            </dl>
+            {{/ ocrsummary }}
+        </div>
+        {{/ hasocrsummary }}
+
+        {{# hasconfirmedproblems }}
+        <div class="stackgen-kc-confirmed-summary mb-3">
+            <h4 class="h6">{{# str }} kc_confirmed_wronganswers_heading, qbank_stackgen {{/ str }}</h4>
+            {{# confirmedproblems }}
+            <div class="mb-2">
+                <div class="font-weight-bold small">{{name}}</div>
+                <ul class="mb-0 pl-3 small">
+                    {{# wronganswers }}
+                    <li>
+                        <code>{{expression}}</code>
+                        {{# kc_name }}<span class="badge badge-info ml-1">{{kc_name}}</span>{{/ kc_name }}
+                        {{# feedback }}<div class="text-muted">{{feedback}}</div>{{/ feedback }}
+                    </li>
+                    {{/ wronganswers }}
+                </ul>
+            </div>
+            {{/ confirmedproblems }}
+        </div>
+        {{/ hasconfirmedproblems }}
+
+        {{# notstarted }}
+        <form method="post" action="{{startactionurl}}">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <input type="hidden" name="courseid" value="{{courseid}}">
+            <input type="hidden" name="jobid" value="{{id}}">
+            <input type="hidden" name="action" value="start">
+            <button type="submit" class="btn btn-primary btn-sm">
+                {{# str }} kc_start_button, qbank_stackgen {{/ str }}
+            </button>
+        </form>
+        {{/ notstarted }}
+
+        {{# hasreviewproblems }}
+        <div class="stackgen-kc-review-panel"
+             data-jobid="{{id}}"
+             data-confirmurl="{{confirmurl}}"
+             data-courseid="{{courseid}}"
+             data-sesskey="{{sesskey}}"
+             data-awaiting-label="{{# str }} kc_awaiting_xml, qbank_stackgen {{/ str }}">
+            {{# reviewproblems }}
+            <div class="stackgen-kc-review-problem border-top pt-2 mt-2" data-problem-index="{{index}}">
+                <dl class="row mb-3 small">
+                    <dt class="col-sm-2">{{# str }} ocr_question_text, qbank_stackgen {{/ str }}</dt>
+                    <dd class="col-sm-10">{{question_text}}</dd>
+                    <dt class="col-sm-2">{{# str }} ocr_problem_expression, qbank_stackgen {{/ str }}</dt>
+                    <dd class="col-sm-10">
+                        <code>{{problem_expression}}</code>
+                        <div class="mt-1">\( {{problem_expression}} \)</div>
+                    </dd>
+                    {{# has_answer }}
+                    <dt class="col-sm-2">{{# str }} ocr_answer_expression, qbank_stackgen {{/ str }}</dt>
+                    <dd class="col-sm-10">
+                        <code>{{answer_expression}}</code>
+                        <div class="mt-1">\( {{answer_expression}} \)</div>
+                    </dd>
+                    {{/ has_answer }}
+                </dl>
+
+                <h4 class="h6">{{# str }} kc_wronganswers_heading, qbank_stackgen {{/ str }}</h4>
+
+                <div class="stackgen-kc-wa-list" data-problem-index="{{index}}">
+                    {{# wronganswers }}
+                    <div class="row stackgen-kc-wa-row align-items-start mb-2 pb-2 border-bottom" data-row-index="{{index}}">
+                        <div class="col-md-4">
+                            <label class="small mb-1 d-block">{{# str }} kc_wa_expression, qbank_stackgen {{/ str }}</label>
+                            <input type="text" class="form-control form-control-sm stackgen-kc-wa-expression" value="{{expression}}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="small mb-1 d-block">{{# str }} kc_wa_kc, qbank_stackgen {{/ str }}</label>
+                            <select class="form-control form-control-sm stackgen-kc-wa-kc">
+                                {{# kc_options }}
+                                <option value="{{id}}" {{# selected }}selected{{/ selected }}>{{label}}</option>
+                                {{/ kc_options }}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small mb-1 d-block">{{# str }} kc_wa_feedback, qbank_stackgen {{/ str }}</label>
+                            <textarea class="form-control form-control-sm stackgen-kc-wa-feedback" rows="2">{{feedback}}</textarea>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end justify-content-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger stackgen-kc-wa-remove" title="{{# str }} kc_wa_remove, qbank_stackgen {{/ str }}">&times;</button>
+                        </div>
+                    </div>
+                    {{/ wronganswers }}
+                </div>
+
+                <template class="stackgen-kc-wa-template">
+                    <div class="row stackgen-kc-wa-row align-items-start mb-2 pb-2 border-bottom" data-row-index="__INDEX__">
+                        <div class="col-md-4">
+                            <label class="small mb-1 d-block">{{# str }} kc_wa_expression, qbank_stackgen {{/ str }}</label>
+                            <input type="text" class="form-control form-control-sm stackgen-kc-wa-expression" value="">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="small mb-1 d-block">{{# str }} kc_wa_kc, qbank_stackgen {{/ str }}</label>
+                            <select class="form-control form-control-sm stackgen-kc-wa-kc">
+                                {{# kc_options }}
+                                <option value="{{id}}" {{# selected }}selected{{/ selected }}>{{label}}</option>
+                                {{/ kc_options }}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small mb-1 d-block">{{# str }} kc_wa_feedback, qbank_stackgen {{/ str }}</label>
+                            <textarea class="form-control form-control-sm stackgen-kc-wa-feedback" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end justify-content-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger stackgen-kc-wa-remove" title="{{# str }} kc_wa_remove, qbank_stackgen {{/ str }}">&times;</button>
+                        </div>
+                    </div>
+                </template>
+
+                <button type="button" class="btn btn-sm btn-outline-secondary stackgen-kc-wa-add" data-problem-index="{{index}}">
+                    {{# str }} kc_wa_add, qbank_stackgen {{/ str }}
+                </button>
+            </div>
+            {{/ reviewproblems }}
+
+            <button type="button" class="btn btn-primary btn-sm mt-3 stackgen-kc-review-confirm" data-jobid="{{id}}">
+                {{# str }} kc_confirm_button, qbank_stackgen {{/ str }}
+            </button>
+            <span class="stackgen-kc-review-status ml-2 small text-muted"></span>
+        </div>
+        {{/ hasreviewproblems }}
+
+        {{# awaitingxml }}
+        <div class="text-muted small">
+            <span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
+            {{# str }} kc_awaiting_xml, qbank_stackgen {{/ str }}
+        </div>
+        {{/ awaitingxml }}
+
+        {{# processing }}
+        <div class="text-muted small">
+            <span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
+            {{# str }} kc_status_processing, qbank_stackgen {{/ str }}
+        </div>
+        {{/ processing }}
+
+        {{# haserror }}
+        <div class="alert alert-danger small mb-2">{{error_msg}}</div>
+        <form method="post" action="{{startactionurl}}">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <input type="hidden" name="courseid" value="{{courseid}}">
+            <input type="hidden" name="jobid" value="{{id}}">
+            <input type="hidden" name="action" value="retry">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                {{# str }} kc_retry_button, qbank_stackgen {{/ str }}
+            </button>
+        </form>
+        {{/ haserror }}
+
+        {{# isapproved }}
+        <a href="{{bankurl}}" class="btn btn-outline-primary btn-sm">
+            {{# str }} import_view_bank, qbank_stackgen {{/ str }}
+        </a>
+        {{/ isapproved }}
+    </div>
+</div>

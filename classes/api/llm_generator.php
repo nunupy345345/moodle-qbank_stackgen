@@ -283,6 +283,7 @@ SYS;
      * 1問分の STACK XML (<question> ブロック) を生成する。
      *
      * @param array $wronganswers  [['expression'=>..., 'misconception'=>..., 'feedback'=>...], ...]
+     *                             （KC診断版から呼ばれる場合は misconception の代わりに kc_name を持つ）
      * @param string $name  教員がレビュー画面で確定した問題名。空ならLLM任せの名前をそのまま使う。
      * @param string $lasterror  直前の試行のCAS検証エラー内容。空でなければ再生成時にLLMへ伝える。
      * @param array $examples  Step 6 RAG: この問題に類似した過去の良問（rag_search::search()の結果）
@@ -318,8 +319,9 @@ SYS;
             $user_msg .= "\n教員が確定した誤答例（この順番でノードを直列に追加すること）:\n";
             foreach ($wronganswers as $j => $w) {
                 $n = $j + 1;
+                $reason = $w['misconception'] ?? ($w['kc_name'] ?? '');
                 $user_msg .= "  誤答{$n}: 式=" . ($w['expression'] ?? '') . "、"
-                    . "想定原因=" . ($w['misconception'] ?? '') . "、"
+                    . "想定原因=" . $reason . "、"
                     . "フィードバック=" . ($w['feedback'] ?? '') . "\n";
             }
         } else {

@@ -24,6 +24,24 @@
         <input type="hidden" name="courseid" value="{{courseid}}">
         <input type="hidden" name="image_b64" value="">
 
+        <fieldset class="form-group mb-3">
+            <legend class="h6">{{# str }} upload_track_heading, qbank_stackgen {{/ str }}</legend>
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="stackgen-track-traditional"
+                       name="track_traditional" value="1" checked>
+                <label class="form-check-label" for="stackgen-track-traditional">
+                    {{# str }} upload_track_traditional, qbank_stackgen {{/ str }}
+                </label>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="stackgen-track-kc"
+                       name="track_kc" value="1">
+                <label class="form-check-label" for="stackgen-track-kc">
+                    {{# str }} upload_track_kc, qbank_stackgen {{/ str }}
+                </label>
+            </div>
+        </fieldset>
+
         <div class="form-group mb-3">
             <label for="stackgen-file-input" class="form-label">
                 {{# str }} upload_label, qbank_stackgen {{/ str }}

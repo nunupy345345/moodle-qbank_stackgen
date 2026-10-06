@@ -5,6 +5,7 @@ $string['pluginname']                    = 'STACK question generator (from image
 $string['pluginname_desc']               = 'Automatically generates Moodle STACK questions from textbook images.';
 
 $string['generate_from_image']           = 'Generate from image';
+$string['kc_page_short_title']           = 'KC diagnosis version (separate page)';
 
 $string['upload_page_title']             = 'Generate question from image';
 $string['upload_instructions']           = 'Upload an image of a textbook or worksheet. The image will be preprocessed in your browser and the question will be generated automatically in the background.';
@@ -18,6 +19,10 @@ $string['upload_processing']             = 'Processing in the background. Please
 $string['upload_folder_heading']         = 'Bulk upload from a folder';
 $string['upload_folder_label']           = 'Select an image folder (all images in it will be queued)';
 $string['upload_folder_submit']          = 'Upload folder contents';
+$string['upload_track_heading']          = 'Generation method (choose one or both)';
+$string['upload_track_traditional']      = 'Generate the traditional version (free-text wrong answers)';
+$string['upload_track_kc']               = 'Also generate the KC version (knowledge-component-based wrong answers, reviewed on a separate page)';
+$string['upload_error_notrack']          = 'Please select at least one generation method.';
 
 // Job list filter.
 $string['filter_status_label']           = 'Filter by status';
@@ -90,6 +95,30 @@ $string['review_awaiting_xml']           = 'Generating STACK XML in the backgrou
 $string['import_category_name']          = 'STACKGen Auto-generated';
 $string['import_success']                = 'Registered in the question bank.';
 $string['import_view_bank']              = 'View in question bank';
+
+// KC diagnosis page (separate page). Fully independent from upload.php/review.php.
+$string['kc_page_title']                 = 'KC diagnosis version (knowledge-component-based wrong answers)';
+$string['kc_instructions']               = 'For each already-OCR\'d image, generate wrong-answer examples grounded in prerequisite knowledge components (KC), then run XML generation through question bank registration once confirmed (a separate track from the existing "Generate from image" page).';
+$string['kc_confirmed_wronganswers_heading'] = 'Confirmed wrong answers (KC-based)';
+$string['kc_no_jobs']                    = 'No OCR\'d jobs found. Please upload images on the "Generate from image" page first.';
+$string['kc_status_not_started']         = 'Not started';
+$string['kc_status_feedback_pending']    = 'Awaiting feedback review';
+$string['kc_status_processing']          = 'Processing automatically...';
+$string['kc_start_button']               = 'Generate KC-based wrong answers';
+$string['kc_start_success']              = 'Queued KC-based feedback generation. It will be processed automatically shortly.';
+$string['kc_retry_button']               = 'Retry';
+$string['kc_retry_success']              = 'Queued for retry. It will be processed automatically shortly.';
+$string['kc_wronganswers_heading']       = 'Wrong-answer examples (KC-based)';
+$string['kc_wa_expression']              = 'Wrong answer (Maxima expression)';
+$string['kc_wa_kc']                      = 'Missing knowledge component (KC)';
+$string['kc_wa_feedback']                = 'Feedback text';
+$string['kc_wa_add']                     = '+ Add wrong-answer example';
+$string['kc_wa_remove']                  = 'Remove';
+$string['kc_confirm_button']             = 'Confirm and generate XML';
+$string['kc_confirm_success']            = 'Confirmed. Generating STACK XML in the background.';
+$string['kc_awaiting_xml']               = 'Generating STACK XML in the background. Please wait.';
+$string['kc_error_wrongstatus']          = 'This job is not currently awaiting KC feedback review.';
+$string['kc_error_invalid']              = 'Invalid feedback data.';
 
 // Errors.
 $string['error_no_capability']           = 'You do not have permission to perform this action.';

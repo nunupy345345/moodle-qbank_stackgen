@@ -1,0 +1,23 @@
+{{!
+    Template: qbank_stackgen/kc_job_list
+
+    KC診断版（別ページ、kc_review.php）のジョブ一覧全体。既存の upload_form.mustache /
+    job_card.mustache とは完全に独立したテンプレート。qbank_stackgen\local\kc_job_view::build()
+    が返す配列と1:1で対応する要素を jobs[] に持つ。1ジョブ分の表示は kc_job_card.mustache
+    （amd/src/kc_status_poll.js から単独レンダリングもされる）に分離している。
+
+    Context variables:
+      - courseid
+      - hasjobs, jobs[]
+}}
+<div class="qbank-stackgen-kc-jobs stackgen-kc-page">
+    <p class="text-muted">{{# str }} kc_instructions, qbank_stackgen {{/ str }}</p>
+
+    {{^ hasjobs }}
+    <div class="alert alert-info">{{# str }} kc_no_jobs, qbank_stackgen {{/ str }}</div>
+    {{/ hasjobs }}
+
+    {{# jobs }}
+    {{> qbank_stackgen/kc_job_card }}
+    {{/ jobs }}
+</div>

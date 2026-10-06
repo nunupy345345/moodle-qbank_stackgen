@@ -104,6 +104,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // フォルダ一括アップロード（amd/src/upload.jsのfetch経由）から送られる元ファイル名。
     // 単発アップロードのフォームには存在しないため、送られなければNULLのまま(重複チェックはしない)。
     $sourcefilename = optional_param('sourcefilename', '', PARAM_FILE) ?: null;
+    // 生成方式チェックボックス。未チェックのフィールドはPOSTされないため、両方optional_param。
+    $track_traditional = optional_param('track_traditional', '', PARAM_ALPHANUM) !== '';
+    $track_kc           = optional_param('track_kc', '', PARAM_ALPHANUM) !== '';
 
     if (empty($image_b64)) {
         redirect(
@@ -114,17 +117,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
     }
 
+    if (!$track_traditional && !$track_kc) {
+        redirect(
+            new moodle_url('/question/bank/stackgen/upload.php', ['courseid' => $courseid]),
+            get_string('upload_error_notrack', 'qbank_stackgen'),
+            null,
+            \core\output\notification::NOTIFY_ERROR
+        );
+    }
+
     // Insert job record.
     $now   = time();
     $jobid = $DB->insert_record('qbank_stackgen_jobs', (object)[
-        'courseid'       => $courseid,
-        'userid'         => $USER->id,
-        'status'         => 'pending',
-        'image_b64'      => $image_b64,
-        'sourcefilename' => $sourcefilename,
-        'retry_count'    => 0,
-        'timecreated'    => $now,
-        'timemodified'   => $now,
+        'courseid'          => $courseid,
+        'userid'            => $USER->id,
+        'status'            => 'pending',
+        'image_b64'         => $image_b64,
+        'sourcefilename'    => $sourcefilename,
+        'track_traditional' => (int)$track_traditional,
+        'track_kc'          => (int)$track_kc,
+        'retry_count'       => 0,
+        'timecreated'       => $now,
+        'timemodified'      => $now,
     ]);
 
     // Queue Adhoc Task.
@@ -145,7 +159,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 10件ずつという不均等な構成にする。ステータスで絞り込んだ場合は「最新1件だけ特別扱い」という
 // 前提が意味をなさないため、1ページ目から10件ずつの通常ページングに切り替える。
 $page    = optional_param('page', 0, PARAM_INT);
-$status  = optional_param('status', '', PARAM_ALPHA);
+// ocr_done / feedback_pending / requires_manual_review のようにアンダースコアを含む値があるため、
+// 英字のみのPARAM_ALPHAは使えない（$actionと同じ理由）。
+$status  = optional_param('status', '', PARAM_ALPHANUMEXT);
 $perpage = 10;
 
 $PAGE->requires->js_call_amd('qbank_stackgen/upload', 'init', ['stackgen-upload-form']);
@@ -158,6 +174,23 @@ if ($page === 0 && $status === '') {
 }
 
 echo $OUTPUT->header();
+
+// 問題バンク共通ツールバー（問題/エクスポート/インポート/カテゴリ/画像から生成）。
+// upload.php独自ページはこれまでこのツールバーを表示していなかったため、他のqbank系画面に
+// 戻れなかった。question/bank/exportquestions/export.php等と同じ組み立て方で表示する。
+$qbankrenderer = $PAGE->get_renderer('core_question', 'bank');
+$qbankaction    = new \core_question\output\qbank_action_menu($PAGE->url);
+echo $qbankrenderer->render($qbankaction);
+
+// KC診断版（別ページ、kc_review.php）はMoodle側の制約で上のツールバーには載せられない
+// （1プラグイン1項目までのため）。シンプルなリンクで行き来できるようにしておく。
+echo \html_writer::div(
+    \html_writer::link(
+        new \moodle_url('/question/bank/stackgen/kc_review.php', ['courseid' => $courseid]),
+        get_string('kc_page_short_title', 'qbank_stackgen')
+    ),
+    'mb-3'
+);
 
 // このユーザー・このコースのジョブが1件でもあれば、絞り込みが空振りでも一覧セクション自体
 // （フィルタUI含む）は表示する。

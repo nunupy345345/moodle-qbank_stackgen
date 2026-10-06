@@ -5,9 +5,15 @@ define(['core/notification'], function(Notification) {
      * Collects all wrong-answer rows for a given problem block into a plain object.
      *
      * @param {Element} problemEl  .stackgen-review-problem element
-     * @returns {Object} {wronganswers: [{expression, misconception, feedback}, ...]}
+     * @returns {Object} {name, questiontext, wronganswers: [{expression, misconception, feedback}, ...]}
      */
     function collectProblem(problemEl) {
+        var nameInput = problemEl.querySelector('.stackgen-review-name');
+        var name = nameInput ? nameInput.value.trim() : '';
+
+        var questiontextInput = problemEl.querySelector('.stackgen-review-questiontext');
+        var questiontext = questiontextInput ? questiontextInput.value.trim() : '';
+
         var rows = problemEl.querySelectorAll('.stackgen-wronganswer-row');
         var wronganswers = [];
 
@@ -23,7 +29,7 @@ define(['core/notification'], function(Notification) {
             });
         });
 
-        return {wronganswers: wronganswers};
+        return {name: name, questiontext: questiontext, wronganswers: wronganswers};
     }
 
     function typeset(panel) {

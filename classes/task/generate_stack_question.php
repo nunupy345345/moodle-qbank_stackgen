@@ -20,6 +20,14 @@ namespace qbank_stackgen\task;
  * Step 6（RAG）: Stage 3突入時（run_feedback_stage）に一度だけ教員手作りコーパス
  * （qbank_stackgen_examples）を検索し、結果を rag_examples_used に保存する。
  * Stage 4（run_xml_stage）はCAS検証リトライのたびに再検索せず、この保存結果を使い回す。
+ *
+ * 生成方式の選択（アップロード画面のチェックボックス、`track_traditional`/`track_kc`列）:
+ *   - `track_traditional` が偽の場合、Stage 2（OCR）完了後は何もせず ocr_done で停止する
+ *     （この系統の誤答例生成・XML生成・問題バンク登録は一切行わない）。
+ *   - `track_kc` が真の場合、Stage 2（OCR）完了直後（`ocr_result`が揃ったタイミング）に、
+ *     別系統のAdhoc Task（generate_stack_question_kc、KC起点の誤答例〜問題バンク登録）を
+ *     自動でキューする。既存のkc_review.phpの手動開始ボタンは、この自動キューを選ばなかった
+ *     旧ジョブに後からKC版を追加する用途として引き続き使える。
  */
 class generate_stack_question extends \core\task\adhoc_task {
 
@@ -74,11 +82,23 @@ class generate_stack_question extends \core\task\adhoc_task {
                 return;
             }
 
+            $this->maybe_start_kc_track($jobid, $job);
+
+            if (empty($job->track_traditional)) {
+                mtrace("[qbank_stackgen] Job {$jobid}: traditional track not selected, stopping after OCR.");
+                return;
+            }
+
             $this->run_feedback_stage($jobid, $problems);
             return;
         }
 
         if ($job->status === 'ocr_done') {
+            if (empty($job->track_traditional)) {
+                mtrace("[qbank_stackgen] Job {$jobid}: traditional track not selected, nothing to resume.");
+                return;
+            }
+
             // OCR 済み: 既存の ocr_result を使って Stage 3（誤答例/フィードバック案生成）へ。
             $ocr_data = json_decode($job->ocr_result, true);
             $problems = isset($ocr_data['problems']) ? $ocr_data['problems'] : [$ocr_data];
@@ -125,6 +145,22 @@ class generate_stack_question extends \core\task\adhoc_task {
         }
 
         mtrace("[qbank_stackgen] Job {$jobid}: unexpected status={$job->status}, skipping.");
+    }
+
+    /**
+     * `track_kc` が選択されていれば、別系統のAdhoc Task（generate_stack_question_kc）を
+     * OCR完了直後にキューする。KC版は既存の`status`/`feedback_*`/`xml_result`等には触れず、
+     * `kc_*`列だけを読み書きするため、この系統（従来版）の状態遷移とは独立して進行する。
+     */
+    private function maybe_start_kc_track(int $jobid, \stdClass $job): void {
+        if (empty($job->track_kc)) {
+            return;
+        }
+
+        $task = new generate_stack_question_kc();
+        $task->set_custom_data(['jobid' => $jobid]);
+        \core\task\manager::queue_adhoc_task($task, true);
+        mtrace("[qbank_stackgen] Job {$jobid}: KC track selected, queued generate_stack_question_kc.");
     }
 
     /**

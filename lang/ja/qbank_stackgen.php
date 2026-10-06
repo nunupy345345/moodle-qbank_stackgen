@@ -6,6 +6,7 @@ $string['pluginname_desc']               = '教科書画像からMoodle STACK問
 
 // Navigation.
 $string['generate_from_image']           = '画像から生成';
+$string['kc_page_short_title']           = 'KC診断版（別ページ）';
 
 // Upload page.
 $string['upload_page_title']             = '教科書画像から問題を生成';
@@ -20,6 +21,10 @@ $string['upload_processing']             = 'バックグラウンドで処理中
 $string['upload_folder_heading']         = 'フォルダから一括アップロード';
 $string['upload_folder_label']           = '画像フォルダを選択（フォルダ内の画像をまとめて処理します）';
 $string['upload_folder_submit']          = 'フォルダの内容をアップロード';
+$string['upload_track_heading']          = '生成方式（複数選択可）';
+$string['upload_track_traditional']      = '従来版（自由記述の誤答例）を生成';
+$string['upload_track_kc']               = 'KC版（前提知識起点の誤答例）も生成（確認は別ページ）';
+$string['upload_error_notrack']          = '少なくとも一方の生成方式を選択してください。';
 
 // Job list filter.
 $string['filter_status_label']           = 'ステータスで絞り込み';
@@ -94,6 +99,30 @@ $string['review_awaiting_xml']           = 'バックグラウンドでSTACK XML
 $string['import_category_name']          = 'STACKGen自動生成';
 $string['import_success']                = '問題バンクに登録済みです。';
 $string['import_view_bank']              = '問題バンクで確認';
+
+// KC diagnosis page (別ページ). 既存のupload.php/review.phpとは完全に独立した系統。
+$string['kc_page_title']                 = 'KC診断版（前提知識起点の誤答例）';
+$string['kc_instructions']               = 'OCR済みの画像それぞれについて、前提知識（KC）起点で誤答例を生成し、確定した内容でXML生成〜問題バンク登録まで実行します（既存の画像から生成ページとは独立した別系統です）。';
+$string['kc_confirmed_wronganswers_heading'] = '確定済みの誤答例（KC起点）';
+$string['kc_no_jobs']                    = 'OCR済みのジョブがありません。先に「画像から生成」ページで画像をアップロードしてください。';
+$string['kc_status_not_started']         = '未着手';
+$string['kc_status_feedback_pending']    = '誤答例レビュー待ち';
+$string['kc_status_processing']          = '自動実行中...';
+$string['kc_start_button']               = 'KC版の誤答例を生成';
+$string['kc_start_success']              = 'KC版の誤答例生成をキューに登録しました。しばらくすると自動的に処理されます。';
+$string['kc_retry_button']               = '再実行';
+$string['kc_retry_success']              = '再実行キューに登録しました。しばらくすると自動的に処理されます。';
+$string['kc_wronganswers_heading']       = '誤答例（KC起点）';
+$string['kc_wa_expression']              = '誤答の式（Maxima記法）';
+$string['kc_wa_kc']                      = '欠けている前提知識(KC)';
+$string['kc_wa_feedback']                = 'フィードバック文';
+$string['kc_wa_add']                     = '＋ 誤答例を追加';
+$string['kc_wa_remove']                  = '削除';
+$string['kc_confirm_button']             = '確定してXML生成へ進む';
+$string['kc_confirm_success']            = '確定しました。バックグラウンドでSTACK XMLを生成します。';
+$string['kc_awaiting_xml']               = 'バックグラウンドでSTACK XMLを生成中です。しばらくお待ちください。';
+$string['kc_error_wrongstatus']          = 'このジョブは現在KC版のレビュー待ちではありません。';
+$string['kc_error_invalid']              = '不正なフィードバックデータです。';
 
 // Errors.
 $string['error_no_capability']           = 'この操作を実行する権限がありません。';

@@ -77,6 +77,31 @@ define(['core/notification'], function(Notification) {
             var b64Input  = form.querySelector('input[name="image_b64"]');
             var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
 
+            var trackTraditional = document.getElementById('stackgen-track-traditional');
+            var trackKc          = document.getElementById('stackgen-track-kc');
+
+            function trackSelected() {
+                return (trackTraditional && trackTraditional.checked) || (trackKc && trackKc.checked);
+            }
+
+            // folderSubmit/selectedFiles are declared later in this same function (var hoisting);
+            // this only runs from a 'change' event fired after init() has finished setting them up.
+            function onTrackChange() {
+                if (submitBtn && b64Input.value !== '') {
+                    submitBtn.disabled = !trackSelected();
+                }
+                if (folderSubmit && selectedFiles.length > 0) {
+                    folderSubmit.disabled = !trackSelected();
+                }
+            }
+
+            if (trackTraditional) {
+                trackTraditional.addEventListener('change', onTrackChange);
+            }
+            if (trackKc) {
+                trackKc.addEventListener('change', onTrackChange);
+            }
+
             if (fileInput && b64Input) {
                 fileInput.addEventListener('change', function(e) {
                     var file = e.target.files[0];
@@ -104,12 +129,12 @@ define(['core/notification'], function(Notification) {
                         b64Input.value = b64;
 
                         if (submitBtn) {
-                            submitBtn.disabled = false;
+                            submitBtn.disabled = !trackSelected();
                         }
                     }).catch(function(err) {
                         Notification.exception(err);
                         if (submitBtn) {
-                            submitBtn.disabled = false;
+                            submitBtn.disabled = !trackSelected();
                         }
                     });
                 });
@@ -147,7 +172,7 @@ define(['core/notification'], function(Notification) {
                     }
                     return a.name < b.name ? -1 : 1;
                 });
-                folderSubmit.disabled = selectedFiles.length === 0;
+                folderSubmit.disabled = selectedFiles.length === 0 || !trackSelected();
                 folderProgress.style.display = 'none';
             });
 
@@ -175,6 +200,12 @@ define(['core/notification'], function(Notification) {
                                 body.append('courseid', courseidInput.value);
                                 body.append('image_b64', b64);
                                 body.append('sourcefilename', file.name);
+                                if (trackTraditional && trackTraditional.checked) {
+                                    body.append('track_traditional', '1');
+                                }
+                                if (trackKc && trackKc.checked) {
+                                    body.append('track_kc', '1');
+                                }
                                 return fetch(actionUrl, {method: 'POST', body: body, credentials: 'same-origin'});
                             })
                             .catch(function() {
