@@ -23,7 +23,15 @@ define(['core/ajax', 'core/templates', 'core/notification'], function(Ajax, Temp
      */
     function isOpenForEditing(jobid) {
         var toggle = document.querySelector('.stackgen-review-toggle[data-jobid="' + jobid + '"]');
-        return !!toggle && !toggle.disabled;
+        if (toggle && !toggle.disabled) {
+            return true;
+        }
+
+        // RAGなし比較トラックの編集パネルはトグル無しで常に表示されており、確定成功時に
+        // job_review.js が style.display='none' にするまでDOMに居座る。表示中=未確定とみなし、
+        // 全体再レンダリングで入力中の内容を消さないようにする。
+        var noragPanel = document.querySelector('.stackgen-norag-review-panel[data-jobid="' + jobid + '"]');
+        return !!noragPanel && noragPanel.style.display !== 'none';
     }
 
     function schedule(ms) {
@@ -48,7 +56,8 @@ define(['core/ajax', 'core/templates', 'core/notification'], function(Ajax, Temp
         jobs.forEach(function(job) {
             var card = document.querySelector('.qbank-stackgen-jobs [data-jobid="' + job.id + '"]');
 
-            if (card && !isOpenForEditing(job.id) && job.status !== card.dataset.status) {
+            if (card && !isOpenForEditing(job.id)
+                && (job.status !== card.dataset.status || job.norag_status !== card.dataset.noragStatus)) {
                 renderJobCard(job, card);
             }
 

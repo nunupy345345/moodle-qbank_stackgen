@@ -72,6 +72,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
     }
 
+    if ($action === 'retry_norag') {
+        // RAGなし比較トラック用。既存のaction=retryと同じ判定ロジック（Stage6のみ失敗ならllm_doneから、
+        // それ以外で確定済みならfeedback_pendingから）をnorag_*列に対して行う。
+        $jobid = required_param('jobid', PARAM_INT);
+        $job = $DB->get_record('qbank_stackgen_jobs',
+            ['id' => $jobid, 'courseid' => $courseid, 'userid' => $USER->id], '*', MUST_EXIST);
+
+        $stage6only = !empty($job->norag_xml_result) && !empty($job->norag_error_msg)
+            && strpos($job->norag_error_msg, 'NoRAG Stage6') === 0;
+
+        if ($stage6only) {
+            $resumestatus = 'llm_done';
+        } else if (!empty($job->norag_feedback_confirmed)) {
+            $resumestatus = 'feedback_pending';
+        } else {
+            $resumestatus = '';
+        }
+
+        $DB->update_record('qbank_stackgen_jobs', (object)[
+            'id'                => $jobid,
+            'norag_status'      => $resumestatus,
+            'norag_error_msg'   => null,
+            'norag_retry_count' => $job->norag_retry_count + 1,
+            'timemodified'      => time(),
+        ]);
+
+        $task = new \qbank_stackgen\task\generate_stack_question_norag();
+        $task->set_custom_data(['jobid' => $jobid]);
+        \core\task\manager::queue_adhoc_task($task, true);
+
+        redirect(
+            new moodle_url('/question/bank/stackgen/upload.php', ['courseid' => $courseid]),
+            get_string('retry_success', 'qbank_stackgen'),
+            null,
+            \core\output\notification::NOTIFY_SUCCESS
+        );
+    }
+
     if ($action === 'retry_stage3') {
         // Stage4以降で繰り返し失敗する場合、確定済みの誤答例（feedback_confirmed）自体に
         // 問題があることが多い（例: taと数式的に同値な誤答例）。feedback_confirmedを空に戻し、
@@ -104,9 +142,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // フォルダ一括アップロード（amd/src/upload.jsのfetch経由）から送られる元ファイル名。
     // 単発アップロードのフォームには存在しないため、送られなければNULLのまま(重複チェックはしない)。
     $sourcefilename = optional_param('sourcefilename', '', PARAM_FILE) ?: null;
-    // 生成方式チェックボックス。未チェックのフィールドはPOSTされないため、両方optional_param。
+    // 生成方式チェックボックス。未チェックのフィールドはPOSTされないため、全てoptional_param。
     $track_traditional = optional_param('track_traditional', '', PARAM_ALPHANUM) !== '';
     $track_kc           = optional_param('track_kc', '', PARAM_ALPHANUM) !== '';
+    $track_norag        = optional_param('track_norag', '', PARAM_ALPHANUM) !== '';
 
     if (empty($image_b64)) {
         redirect(
@@ -117,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
     }
 
-    if (!$track_traditional && !$track_kc) {
+    if (!$track_traditional && !$track_kc && !$track_norag) {
         redirect(
             new moodle_url('/question/bank/stackgen/upload.php', ['courseid' => $courseid]),
             get_string('upload_error_notrack', 'qbank_stackgen'),
@@ -136,6 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'sourcefilename'    => $sourcefilename,
         'track_traditional' => (int)$track_traditional,
         'track_kc'          => (int)$track_kc,
+        'track_norag'       => (int)$track_norag,
         'retry_count'       => 0,
         'timecreated'       => $now,
         'timemodified'      => $now,
@@ -226,7 +266,9 @@ $dbjobs = $DB->get_records_select(
     $params,
     'id DESC',
     'id, status, ocr_result, feedback_result, feedback_confirmed, xml_result, error_msg, ' .
-        'question_category_id, retry_count, timecreated, rag_examples_used',
+        'question_category_id, retry_count, timecreated, rag_examples_used, ' .
+        'track_norag, norag_status, norag_feedback_result, norag_feedback_confirmed, ' .
+        'norag_xml_result, norag_error_msg, norag_retry_count, norag_question_category_id',
     $limitfrom, $limitnum
 );
 

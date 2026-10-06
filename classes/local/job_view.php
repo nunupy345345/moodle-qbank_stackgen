@@ -184,6 +184,39 @@ class job_view {
             }
         }
 
+        // 確定済み（feedback_confirmed）があれば、誤答例を読み取り専用で表示し続ける
+        // （レビュー待ち中の編集フォームとは別に、確定後(awaitingxml/validation_failed/
+        // requires_manual_review/approved等)もずっと見える summary として保持する。
+        // KC版・RAGなし版の同様の表示と揃える目的で追加。
+        $confirmedproblems = [];
+        if (!empty($job->feedback_confirmed)) {
+            $ocrall         = json_decode($job->ocr_result ?? '', true) ?: [];
+            $ocrallproblems = $ocrall['problems'] ?? [];
+            $confirmed      = json_decode($job->feedback_confirmed, true) ?: [];
+            $confirmedprobs = $confirmed['problems'] ?? [];
+            foreach ($confirmedprobs as $i => $cp) {
+                $ocrp = $ocrallproblems[$i] ?? [];
+                $wronganswers = [];
+                foreach ((array)($cp['wronganswers'] ?? []) as $w) {
+                    $wronganswers[] = [
+                        'expression'    => $w['expression'] ?? '',
+                        'misconception' => $w['misconception'] ?? '',
+                        'feedback'      => $w['feedback'] ?? '',
+                    ];
+                }
+                $confirmedproblems[] = [
+                    'displaynum'         => $i + 1,
+                    'name'               => !empty($cp['name']) ? $cp['name'] : self::default_problem_name($i + 1),
+                    'question_text'      => !empty($cp['questiontext']) ? $cp['questiontext'] : ($ocrp['question_text'] ?? ''),
+                    'question_type'      => $ocrp['question_type'] ?? '',
+                    'problem_expression' => $ocrp['problem_expression'] ?? '',
+                    'answer_expression'  => $ocrp['answer_expression'] ?? null,
+                    'has_answer'         => !empty($ocrp['answer_expression']),
+                    'wronganswers'       => $wronganswers,
+                ];
+            }
+        }
+
         $autoprocessing = in_array($job->status, self::autoprocessing_statuses(), true);
 
         $isapproved = $job->status === 'approved';
@@ -197,6 +230,8 @@ class job_view {
 
         $statuslabels = self::status_labels();
         $statusclasses = self::status_classes();
+
+        $norag = self::build_norag($job, $courseid);
 
         return [
             'id'                 => $job->id,
@@ -222,6 +257,8 @@ class job_view {
             'canreview'          => $needsreview,
             'reviewproblems'     => $reviewproblems,
             'hasreviewproblems'  => !empty($reviewproblems),
+            'confirmedproblems'    => $confirmedproblems,
+            'hasconfirmedproblems' => !empty($confirmedproblems),
             'awaitingxml'        => $awaitingxml,
             'autoprocessing'     => $autoprocessing,
             'isapproved'         => $isapproved,
@@ -230,7 +267,124 @@ class job_view {
             'sesskey'            => $sesskey,
             'courseid'           => $courseid,
             'actionurl'          => (new \moodle_url('/question/bank/stackgen/upload.php'))->out(false),
-            'polling'            => $autoprocessing || $awaitingxml,
+            'polling'            => $autoprocessing || $awaitingxml || ($norag['hasnorag'] && $norag['norag_polling']),
+        ] + $norag;
+    }
+
+    /**
+     * 「RAGなし」比較トラック（norag_*列）の表示用データを組み立てる。同じ画像(ジョブ)について
+     * 従来版(RAGあり)・RAGなし版・KC版を並べて比較できるようにするための追加トラック。
+     * track_norag が選択されていないジョブでは hasnorag=false にして、テンプレート側で
+     * このセクション全体を非表示にする。
+     *
+     * @param \stdClass $job
+     * @param int $courseid
+     * @return array
+     */
+    private static function build_norag(\stdClass $job, int $courseid): array {
+        $hasnorag = !empty($job->track_norag);
+        $norag_status = $job->norag_status ?? '';
+
+        $needsreview = $norag_status === 'feedback_pending' && empty($job->norag_feedback_confirmed);
+        $awaitingxml = $norag_status === 'feedback_pending' && !empty($job->norag_feedback_confirmed);
+        // ''（未着手・自動キュー待ち）とllm_done（Stage6のみ再実行待ち）は、既存ページの
+        // autoprocessingと同様、細かく出し分けずまとめて「自動処理中」スピナーにする。
+        $processing = in_array($norag_status, ['', 'llm_done'], true);
+        $haserror   = $norag_status === 'requires_manual_review';
+        $isapproved = $norag_status === 'approved';
+
+        $ocrdata  = json_decode($job->ocr_result ?? '', true) ?: [];
+        $problems = $ocrdata['problems'] ?? [];
+
+        $reviewproblems = [];
+        if ($needsreview) {
+            $draft = json_decode($job->norag_feedback_result ?? '', true) ?: [];
+            $draftproblems = $draft['problems'] ?? [];
+
+            foreach ($problems as $i => $p) {
+                $wronganswers = [];
+                foreach (($draftproblems[$i]['wronganswers'] ?? []) as $j => $w) {
+                    $wronganswers[] = [
+                        'index'         => $j,
+                        'expression'    => $w['expression'] ?? '',
+                        'misconception' => $w['misconception'] ?? '',
+                        'feedback'      => $w['feedback'] ?? '',
+                    ];
+                }
+
+                $reviewproblems[] = [
+                    'index'              => $i,
+                    'displaynum'         => $i + 1,
+                    'name'               => self::default_problem_name($i + 1),
+                    'question_text'      => $p['question_text'] ?? '',
+                    'question_type'      => $p['question_type'] ?? '',
+                    'problem_expression' => $p['problem_expression'] ?? '',
+                    'answer_expression'  => $p['answer_expression'] ?? null,
+                    'has_answer'         => !empty($p['answer_expression']),
+                    'wronganswers'       => $wronganswers,
+                ];
+            }
+        }
+
+        // 確定済み（norag_feedback_confirmed）があれば、誤答例を読み取り専用で表示し続ける
+        // （レビュー待ち中の編集フォームとは別に、確定後もずっと見える summary として保持する）。
+        $confirmedproblems = [];
+        if (!empty($job->norag_feedback_confirmed)) {
+            $confirmed      = json_decode($job->norag_feedback_confirmed, true) ?: [];
+            $confirmedprobs = $confirmed['problems'] ?? [];
+            foreach ($confirmedprobs as $i => $cp) {
+                $ocrp = $problems[$i] ?? [];
+                $wronganswers = [];
+                foreach ((array)($cp['wronganswers'] ?? []) as $w) {
+                    $wronganswers[] = [
+                        'expression'    => $w['expression'] ?? '',
+                        'misconception' => $w['misconception'] ?? '',
+                        'feedback'      => $w['feedback'] ?? '',
+                    ];
+                }
+                $confirmedproblems[] = [
+                    'displaynum'         => $i + 1,
+                    'name'               => !empty($cp['name']) ? $cp['name'] : ('問題 ' . ($i + 1)),
+                    'question_text'      => !empty($cp['questiontext']) ? $cp['questiontext'] : ($ocrp['question_text'] ?? ''),
+                    'question_type'      => $ocrp['question_type'] ?? '',
+                    'problem_expression' => $ocrp['problem_expression'] ?? '',
+                    'answer_expression'  => $ocrp['answer_expression'] ?? null,
+                    'has_answer'         => !empty($ocrp['answer_expression']),
+                    'wronganswers'       => $wronganswers,
+                ];
+            }
+        }
+
+        $bankurl = '';
+        if ($isapproved && !empty($job->norag_question_category_id)) {
+            $bankurl = (new \moodle_url('/question/edit.php', [
+                'courseid' => $courseid,
+                'cat'      => $job->norag_question_category_id . ',' . \context_course::instance($courseid)->id,
+            ]))->out(false);
+        }
+
+        // norag_status('') は既存の status_labels()/status_classes() に対応キーが無いため、
+        // 「処理待ち」(status_pending)として表示する(自動キュー直後、Stage3実行前の短い状態)。
+        $noraglabelkey = $norag_status === '' ? 'pending' : $norag_status;
+
+        return [
+            'hasnorag'                => $hasnorag,
+            'norag_status'            => $norag_status,
+            'norag_statuslabel'       => self::status_labels()[$noraglabelkey] ?? $norag_status,
+            'norag_statusclass'       => self::status_classes()[$noraglabelkey] ?? 'secondary',
+            'norag_needsreview'       => $needsreview,
+            'norag_reviewproblems'    => $reviewproblems,
+            'norag_hasreviewproblems' => !empty($reviewproblems),
+            'norag_confirmedproblems'    => $confirmedproblems,
+            'norag_hasconfirmedproblems' => !empty($confirmedproblems),
+            'norag_awaitingxml'       => $awaitingxml,
+            'norag_processing'        => $processing,
+            'norag_haserror'          => $haserror,
+            'norag_error_msg'         => $job->norag_error_msg ?? '',
+            'norag_isapproved'        => $isapproved,
+            'norag_bankurl'           => $bankurl,
+            'norag_confirmurl'        => (new \moodle_url('/question/bank/stackgen/norag_review_confirm.php'))->out(false),
+            'norag_polling'           => $processing || $awaitingxml,
         ];
     }
 }

@@ -19,7 +19,7 @@
       - isapproved, bankurl
       - confirmurl, sesskey, courseid, actionurl
 }}
-<div class="card mb-3" data-jobid="{{id}}" data-status="{{status}}"{{# polling }} data-polling="1"{{/ polling }}>
+<div class="card mb-3" data-jobid="{{id}}" data-status="{{status}}" data-norag-status="{{norag_status}}"{{# polling }} data-polling="1"{{/ polling }}>
     <div class="card-header d-flex justify-content-between align-items-center">
         <span class="font-weight-bold">ジョブ #{{id}}</span>
         <span class="d-flex align-items-center">
@@ -67,6 +67,25 @@
         {{/ problems }}
     </div>
     {{/ hasocr }}
+    {{# hasconfirmedproblems }}
+    <div class="card-body border-top pt-2 pb-2">
+        <h4 class="h6">{{# str }} confirmed_wronganswers_heading, qbank_stackgen {{/ str }}</h4>
+        {{# confirmedproblems }}
+        <div class="mb-2">
+            <div class="font-weight-bold small">{{name}}</div>
+            <ul class="mb-0 pl-3 small">
+                {{# wronganswers }}
+                <li>
+                    <code>{{expression}}</code>
+                    {{# misconception }}<span class="badge badge-info ml-1">{{misconception}}</span>{{/ misconception }}
+                    {{# feedback }}<div class="text-muted">{{feedback}}</div>{{/ feedback }}
+                </li>
+                {{/ wronganswers }}
+            </ul>
+        </div>
+        {{/ confirmedproblems }}
+    </div>
+    {{/ hasconfirmedproblems }}
     {{# hasxml }}
     <div class="card-body border-top pt-2 pb-2">
         <p class="mb-1 small font-weight-bold text-success">
@@ -253,4 +272,151 @@
         {{/ canretrystage3 }}
     </div>
     {{/ canretry }}
+
+    {{# hasnorag }}
+    <div class="card-body border-top pt-2 pb-2 bg-light">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="font-weight-bold small">{{# str }} norag_section_heading, qbank_stackgen {{/ str }}</span>
+            <span class="badge badge-{{norag_statusclass}} px-2 py-1">{{norag_statuslabel}}</span>
+        </div>
+
+        {{# norag_hasconfirmedproblems }}
+        <div class="stackgen-norag-confirmed-summary mb-3">
+            <h4 class="h6">{{# str }} norag_confirmed_wronganswers_heading, qbank_stackgen {{/ str }}</h4>
+            {{# norag_confirmedproblems }}
+            <div class="mb-2">
+                <div class="font-weight-bold small">{{name}}</div>
+                <ul class="mb-0 pl-3 small">
+                    {{# wronganswers }}
+                    <li>
+                        <code>{{expression}}</code>
+                        {{# misconception }}<span class="badge badge-info ml-1">{{misconception}}</span>{{/ misconception }}
+                        {{# feedback }}<div class="text-muted">{{feedback}}</div>{{/ feedback }}
+                    </li>
+                    {{/ wronganswers }}
+                </ul>
+            </div>
+            {{/ norag_confirmedproblems }}
+        </div>
+        {{/ norag_hasconfirmedproblems }}
+
+        {{# norag_hasreviewproblems }}
+        <div class="stackgen-norag-review-panel" data-jobid="{{id}}" data-confirmurl="{{norag_confirmurl}}"
+             data-courseid="{{courseid}}" data-sesskey="{{sesskey}}">
+            {{# norag_reviewproblems }}
+            <div class="stackgen-norag-review-problem border-top pt-2 mt-2" data-problem-index="{{index}}">
+                <div class="mb-2">
+                    <label class="small mb-1 d-block">{{# str }} review_problem_name, qbank_stackgen {{/ str }}</label>
+                    <input type="text" class="form-control form-control-sm stackgen-norag-review-name" value="{{name}}">
+                </div>
+                <dl class="row mb-3 small">
+                    <dt class="col-sm-2">{{# str }} ocr_question_text, qbank_stackgen {{/ str }}</dt>
+                    <dd class="col-sm-10">
+                        <textarea class="form-control form-control-sm stackgen-norag-review-questiontext" rows="3">{{question_text}}</textarea>
+                    </dd>
+                    <dt class="col-sm-2">{{# str }} ocr_problem_expression, qbank_stackgen {{/ str }}</dt>
+                    <dd class="col-sm-10">
+                        <code>{{problem_expression}}</code>
+                        <div class="mt-1">\( {{problem_expression}} \)</div>
+                    </dd>
+                    {{# has_answer }}
+                    <dt class="col-sm-2">{{# str }} ocr_answer_expression, qbank_stackgen {{/ str }}</dt>
+                    <dd class="col-sm-10">
+                        <code>{{answer_expression}}</code>
+                        <div class="mt-1">\( {{answer_expression}} \)</div>
+                    </dd>
+                    {{/ has_answer }}
+                </dl>
+
+                <h4 class="h6">{{# str }} review_wronganswers_heading, qbank_stackgen {{/ str }}</h4>
+
+                <div class="stackgen-norag-wronganswer-list" data-problem-index="{{index}}">
+                    {{# wronganswers }}
+                    <div class="row stackgen-norag-wronganswer-row align-items-start mb-2 pb-2 border-bottom" data-row-index="{{index}}">
+                        <div class="col-md-4">
+                            <label class="small mb-1 d-block">{{# str }} review_wa_expression, qbank_stackgen {{/ str }}</label>
+                            <input type="text" class="form-control form-control-sm stackgen-norag-wa-expression" value="{{expression}}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="small mb-1 d-block">{{# str }} review_wa_misconception, qbank_stackgen {{/ str }}</label>
+                            <input type="text" class="form-control form-control-sm stackgen-norag-wa-misconception" value="{{misconception}}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small mb-1 d-block">{{# str }} review_wa_feedback, qbank_stackgen {{/ str }}</label>
+                            <textarea class="form-control form-control-sm stackgen-norag-wa-feedback" rows="2">{{feedback}}</textarea>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end justify-content-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger stackgen-norag-wa-remove" title="{{# str }} review_wa_remove, qbank_stackgen {{/ str }}">&times;</button>
+                        </div>
+                    </div>
+                    {{/ wronganswers }}
+                </div>
+
+                <template class="stackgen-norag-wronganswer-template">
+                    <div class="row stackgen-norag-wronganswer-row align-items-start mb-2 pb-2 border-bottom" data-row-index="__INDEX__">
+                        <div class="col-md-4">
+                            <label class="small mb-1 d-block">{{# str }} review_wa_expression, qbank_stackgen {{/ str }}</label>
+                            <input type="text" class="form-control form-control-sm stackgen-norag-wa-expression" value="">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="small mb-1 d-block">{{# str }} review_wa_misconception, qbank_stackgen {{/ str }}</label>
+                            <input type="text" class="form-control form-control-sm stackgen-norag-wa-misconception" value="">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small mb-1 d-block">{{# str }} review_wa_feedback, qbank_stackgen {{/ str }}</label>
+                            <textarea class="form-control form-control-sm stackgen-norag-wa-feedback" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end justify-content-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger stackgen-norag-wa-remove" title="{{# str }} review_wa_remove, qbank_stackgen {{/ str }}">&times;</button>
+                        </div>
+                    </div>
+                </template>
+
+                <button type="button" class="btn btn-sm btn-outline-secondary stackgen-norag-wa-add" data-problem-index="{{index}}">
+                    {{# str }} review_wa_add, qbank_stackgen {{/ str }}
+                </button>
+            </div>
+            {{/ norag_reviewproblems }}
+
+            <button type="button" class="btn btn-primary btn-sm mt-3 stackgen-norag-review-confirm" data-jobid="{{id}}">
+                {{# str }} review_confirm_button, qbank_stackgen {{/ str }}
+            </button>
+            <span class="stackgen-norag-review-status ml-2 small text-muted"></span>
+        </div>
+        {{/ norag_hasreviewproblems }}
+
+        {{# norag_awaitingxml }}
+        <div class="text-muted small">
+            <span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
+            {{# str }} review_awaiting_xml, qbank_stackgen {{/ str }}
+        </div>
+        {{/ norag_awaitingxml }}
+
+        {{# norag_processing }}
+        <div class="text-muted small">
+            <span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
+            {{# str }} status_autoprocessing, qbank_stackgen {{/ str }}
+        </div>
+        {{/ norag_processing }}
+
+        {{# norag_haserror }}
+        <div class="alert alert-danger small mb-2">{{norag_error_msg}}</div>
+        <form method="post" action="{{actionurl}}">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <input type="hidden" name="courseid" value="{{courseid}}">
+            <input type="hidden" name="jobid" value="{{id}}">
+            <input type="hidden" name="action" value="retry_norag">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                {{# str }} retry_button, qbank_stackgen {{/ str }}
+            </button>
+        </form>
+        {{/ norag_haserror }}
+
+        {{# norag_isapproved }}
+        <a href="{{norag_bankurl}}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">
+            {{# str }} import_view_bank, qbank_stackgen {{/ str }}
+        </a>
+        {{/ norag_isapproved }}
+    </div>
+    {{/ hasnorag }}
 </div>

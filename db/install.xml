@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="question/bank/stackgen/db" VERSION="20260929" COMMENT="XMLDB file for qbank_stackgen"
+<XMLDB PATH="question/bank/stackgen/db" VERSION="20261006" COMMENT="XMLDB file for qbank_stackgen"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd">
   <TABLES>
@@ -32,6 +32,16 @@
         <FIELD NAME="kc_question_category_id"   TYPE="int"  LENGTH="10" NOTNULL="false" COMMENT="KC診断版Stage6の登録先question_categories.id"/>
         <FIELD NAME="track_traditional"   TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" COMMENT="アップロード時に従来版(自由記述の誤答例)の生成を選択したか"/>
         <FIELD NAME="track_kc"            TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" COMMENT="アップロード時にKC版(前提知識起点の誤答例)の生成も選択したか。trueならOCR完了直後に自動でgenerate_stack_question_kcをキューする"/>
+        <FIELD NAME="track_norag"         TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" COMMENT="アップロード時に従来版をRAGなしで生成(比較用)も選択したか。trueならOCR完了直後に自動でgenerate_stack_question_noragをキューする"/>
+        <FIELD NAME="norag_status"                TYPE="char" LENGTH="30" NOTNULL="true" DEFAULT="" COMMENT="RAGなし比較トラックの進捗。空=未着手。同じ画像のRAGあり(従来版)/RAGなし/KC版を並べて比較する目的で追加"/>
+        <FIELD NAME="norag_feedback_result"       TYPE="text" NOTNULL="false" COMMENT="RAGなし比較トラックStage3: AI生成の誤答例/フィードバック案(JSON)"/>
+        <FIELD NAME="norag_feedback_confirmed"    TYPE="text" NOTNULL="false" COMMENT="RAGなし比較トラック: 教員が確認・修正して確定した誤答例/フィードバック(JSON)"/>
+        <FIELD NAME="norag_xml_result"            TYPE="text" NOTNULL="false" COMMENT="RAGなし比較トラックStage4のSTACK XML"/>
+        <FIELD NAME="norag_llm_cot"               TYPE="text" NOTNULL="false" COMMENT="RAGなし比較トラックStage4のchain-of-thought出力"/>
+        <FIELD NAME="norag_error_msg"             TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="norag_retry_count"           TYPE="int"  LENGTH="2"  NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="norag_question_ids"          TYPE="text" NOTNULL="false" COMMENT="RAGなし比較トラックStage6で問題バンクに登録されたquestion.idのJSON配列"/>
+        <FIELD NAME="norag_question_category_id"  TYPE="int"  LENGTH="10" NOTNULL="false" COMMENT="RAGなし比較トラックStage6の登録先question_categories.id"/>
         <FIELD NAME="timecreated"  TYPE="int"  LENGTH="10" NOTNULL="true"/>
         <FIELD NAME="timemodified" TYPE="int"  LENGTH="10" NOTNULL="true"/>
       </FIELDS>

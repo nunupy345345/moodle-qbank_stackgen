@@ -24,6 +24,7 @@ $string['upload_folder_submit']          = 'フォルダの内容をアップロ
 $string['upload_track_heading']          = '生成方式（複数選択可）';
 $string['upload_track_traditional']      = '従来版（自由記述の誤答例）を生成';
 $string['upload_track_kc']               = 'KC版（前提知識起点の誤答例）も生成（確認は別ページ）';
+$string['upload_track_norag']            = '従来版をRAGなしでも生成（RAGあり/なし比較用）';
 $string['upload_error_notrack']          = '少なくとも一方の生成方式を選択してください。';
 
 // Job list filter.
@@ -86,6 +87,7 @@ $string['review_page_title']             = '誤答例・フィードバックの
 $string['review_instructions']           = 'AIが生成した誤答例とフィードバック案を確認・修正してください。確定するとSTACK XMLのPRT（採点ロジック）に反映されます。';
 $string['review_problem_name']           = '問題名';
 $string['review_wronganswers_heading']   = '誤答例・フィードバック';
+$string['confirmed_wronganswers_heading'] = '確定済みの誤答例';
 $string['review_wa_expression']          = '誤答の式（Maxima記法）';
 $string['review_wa_misconception']       = '想定される誤りの原因';
 $string['review_wa_feedback']            = 'フィードバック文';
@@ -104,8 +106,15 @@ $string['import_view_bank']              = '問題バンクで確認';
 $string['kc_page_title']                 = 'KC診断版（前提知識起点の誤答例）';
 $string['kc_instructions']               = 'OCR済みの画像それぞれについて、前提知識（KC）起点で誤答例を生成し、確定した内容でXML生成〜問題バンク登録まで実行します（既存の画像から生成ページとは独立した別系統です）。';
 $string['kc_confirmed_wronganswers_heading'] = '確定済みの誤答例（KC起点）';
+
+// RAGなし比較トラック（upload.phpの既存ジョブカードに同居。同じ画像で従来版(RAGあり)/RAGなし/
+// KC版を並べて比較する目的）。
+$string['norag_section_heading']             = '従来版（RAGなし・比較用）';
+$string['norag_confirmed_wronganswers_heading'] = '確定済みの誤答例（RAGなし）';
 $string['kc_no_jobs']                    = 'OCR済みのジョブがありません。先に「画像から生成」ページで画像をアップロードしてください。';
 $string['kc_status_not_started']         = '未着手';
+$string['kc_status_queued']              = '自動実行待ち';
+$string['kc_queued_label']               = 'キューに登録済みです。他のジョブの処理が終わり次第、自動的に開始されます。';
 $string['kc_status_feedback_pending']    = '誤答例レビュー待ち';
 $string['kc_status_processing']          = '自動実行中...';
 $string['kc_start_button']               = 'KC版の誤答例を生成';

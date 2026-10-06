@@ -42,7 +42,7 @@ class get_kc_job_statuses extends external_api {
             "courseid = ? AND userid = ? AND ocr_result IS NOT NULL AND ocr_result <> ''",
             [$courseid, $USER->id],
             'id DESC',
-            'id, courseid, ocr_result, kc_status, kc_feedback_result, kc_feedback_confirmed, ' .
+            'id, courseid, ocr_result, track_kc, kc_status, kc_feedback_result, kc_feedback_confirmed, ' .
                 'kc_xml_result, kc_error_msg, kc_retry_count, kc_question_category_id',
             0, 20
         );
@@ -75,6 +75,34 @@ class get_kc_job_statuses extends external_api {
             ),
         ];
 
+        $ocrsummarystructure = [
+            'question_text'      => new external_value(PARAM_RAW, 'Question text'),
+            'question_type'      => new external_value(PARAM_RAW, 'Question type'),
+            'problem_expression' => new external_value(PARAM_RAW, 'Problem expression (LaTeX)'),
+            'answer_expression'  => new external_value(PARAM_RAW, 'Answer expression (LaTeX)', VALUE_OPTIONAL, null, NULL_ALLOWED),
+            'has_answer'         => new external_value(PARAM_BOOL, 'Whether an answer expression is present'),
+        ];
+
+        $confirmedwronganswerstructure = [
+            'expression' => new external_value(PARAM_RAW, 'Wrong-answer expression (Maxima)'),
+            'kc_name'    => new external_value(PARAM_RAW, 'Missing knowledge component name', VALUE_DEFAULT, ''),
+            'feedback'   => new external_value(PARAM_RAW, 'Feedback text', VALUE_DEFAULT, ''),
+        ];
+
+        $confirmedproblemstructure = [
+            'displaynum'         => new external_value(PARAM_INT, 'Display number (1-based)'),
+            'name'               => new external_value(PARAM_TEXT, 'Question name', VALUE_DEFAULT, ''),
+            'question_text'      => new external_value(PARAM_RAW, 'Question text', VALUE_DEFAULT, ''),
+            'question_type'      => new external_value(PARAM_RAW, 'Question type', VALUE_DEFAULT, ''),
+            'problem_expression' => new external_value(PARAM_RAW, 'Problem expression (LaTeX)', VALUE_DEFAULT, ''),
+            'answer_expression'  => new external_value(PARAM_RAW, 'Answer expression (LaTeX)', VALUE_OPTIONAL, null, NULL_ALLOWED),
+            'has_answer'         => new external_value(PARAM_BOOL, 'Whether an answer expression is present'),
+            'wronganswers'       => new external_multiple_structure(
+                new external_single_structure($confirmedwronganswerstructure),
+                'Confirmed wrong answers', VALUE_DEFAULT, []
+            ),
+        ];
+
         $reviewproblemstructure = [
             'index'              => new external_value(PARAM_INT, 'Problem index'),
             'displaynum'         => new external_value(PARAM_INT, 'Display number (1-based)'),
@@ -100,13 +128,24 @@ class get_kc_job_statuses extends external_api {
                 'statuslabel'       => new external_value(PARAM_RAW, 'Translated status label'),
                 'statusclass'       => new external_value(PARAM_ALPHA, 'Bootstrap badge class suffix'),
                 'problemcount'      => new external_value(PARAM_INT, 'Number of OCR problems in this job'),
-                'notstarted'        => new external_value(PARAM_BOOL, 'KC generation not started yet'),
+                'ocrsummary'        => new external_multiple_structure(
+                    new external_single_structure($ocrsummarystructure),
+                    'Always-visible OCR summary', VALUE_DEFAULT, []
+                ),
+                'hasocrsummary'     => new external_value(PARAM_BOOL, 'Has OCR summary'),
+                'notstarted'        => new external_value(PARAM_BOOL, 'KC generation not started yet (track_kc not selected, no task queued)'),
+                'queued'            => new external_value(PARAM_BOOL, 'track_kc selected; auto-queued, waiting for cron to pick it up'),
                 'needsreview'       => new external_value(PARAM_BOOL, 'Needs teacher review'),
                 'reviewproblems'    => new external_multiple_structure(
                     new external_single_structure($reviewproblemstructure),
                     'Problems awaiting review', VALUE_DEFAULT, []
                 ),
                 'hasreviewproblems' => new external_value(PARAM_BOOL, 'Has reviewable problems'),
+                'confirmedproblems'    => new external_multiple_structure(
+                    new external_single_structure($confirmedproblemstructure),
+                    'Confirmed problems (read-only summary)', VALUE_DEFAULT, []
+                ),
+                'hasconfirmedproblems' => new external_value(PARAM_BOOL, 'Has confirmed problems'),
                 'awaitingxml'       => new external_value(PARAM_BOOL, 'Confirmed, awaiting XML generation'),
                 'processing'        => new external_value(PARAM_BOOL, 'Stage6 import in progress (resumed from llm_done)'),
                 'haserror'          => new external_value(PARAM_BOOL, 'Has error'),

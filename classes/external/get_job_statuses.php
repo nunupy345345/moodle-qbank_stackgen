@@ -43,7 +43,9 @@ class get_job_statuses extends external_api {
             [$courseid, $USER->id],
             'id DESC',
             'id, status, ocr_result, feedback_result, feedback_confirmed, xml_result, error_msg, ' .
-                'question_category_id, retry_count, timecreated, rag_examples_used',
+                'question_category_id, retry_count, timecreated, rag_examples_used, ' .
+                'track_norag, norag_status, norag_feedback_result, norag_feedback_confirmed, ' .
+                'norag_xml_result, norag_error_msg, norag_retry_count, norag_question_category_id',
             0, 1
         );
 
@@ -94,6 +96,36 @@ class get_job_statuses extends external_api {
             ),
         ]);
 
+        // RAGなし比較トラック(norag_*)用。従来版と同じ誤答例の形(misconception)を使う点が
+        // KC版(kc_id/kc_name)との違い。
+        $noragconfirmedwrongansstructure = [
+            'expression'    => new external_value(PARAM_RAW, 'Wrong-answer expression (Maxima)'),
+            'misconception' => new external_value(PARAM_RAW, 'Likely misconception', VALUE_DEFAULT, ''),
+            'feedback'      => new external_value(PARAM_RAW, 'Feedback text', VALUE_DEFAULT, ''),
+        ];
+        $noragconfirmedproblemstructure = [
+            'displaynum'         => new external_value(PARAM_INT, 'Display number (1-based)'),
+            'name'               => new external_value(PARAM_TEXT, 'Question name', VALUE_DEFAULT, ''),
+            'question_text'      => new external_value(PARAM_RAW, 'Question text', VALUE_DEFAULT, ''),
+            'question_type'      => new external_value(PARAM_RAW, 'Question type', VALUE_DEFAULT, ''),
+            'problem_expression' => new external_value(PARAM_RAW, 'Problem expression (LaTeX)', VALUE_DEFAULT, ''),
+            'answer_expression'  => new external_value(PARAM_RAW, 'Answer expression (LaTeX)', VALUE_OPTIONAL, null, NULL_ALLOWED),
+            'has_answer'         => new external_value(PARAM_BOOL, 'Whether an answer expression is present'),
+            'wronganswers'       => new external_multiple_structure(
+                new external_single_structure($noragconfirmedwrongansstructure),
+                'Confirmed wrong answers', VALUE_DEFAULT, []
+            ),
+        ];
+        $noragreviewproblemstructure = array_merge($noragconfirmedproblemstructure, [
+            'index'        => new external_value(PARAM_INT, 'Problem index'),
+            'wronganswers' => new external_multiple_structure(
+                new external_single_structure(array_merge($noragconfirmedwrongansstructure, [
+                    'index' => new external_value(PARAM_INT, 'Row index'),
+                ])),
+                'Wrong answers', VALUE_DEFAULT, []
+            ),
+        ]);
+
         return new external_multiple_structure(
             new external_single_structure([
                 'id'          => new external_value(PARAM_INT, 'Job id'),
@@ -123,6 +155,11 @@ class get_job_statuses extends external_api {
                     'Problems awaiting review', VALUE_DEFAULT, []
                 ),
                 'hasreviewproblems' => new external_value(PARAM_BOOL, 'Has reviewable problems'),
+                'confirmedproblems'    => new external_multiple_structure(
+                    new external_single_structure($noragconfirmedproblemstructure),
+                    'Confirmed problems (read-only summary)', VALUE_DEFAULT, []
+                ),
+                'hasconfirmedproblems' => new external_value(PARAM_BOOL, 'Has confirmed problems'),
                 'awaitingxml'       => new external_value(PARAM_BOOL, 'Confirmed, awaiting XML generation'),
                 'autoprocessing'    => new external_value(PARAM_BOOL, 'Being auto-processed by cron'),
                 'isapproved'        => new external_value(PARAM_BOOL, 'Registered in the question bank'),
@@ -132,6 +169,32 @@ class get_job_statuses extends external_api {
                 'courseid'          => new external_value(PARAM_INT, 'Course id'),
                 'actionurl'         => new external_value(PARAM_URL, 'upload.php URL'),
                 'polling'           => new external_value(PARAM_BOOL, 'Still changing via background task'),
+
+                // RAGなし比較トラック(norag_*)。同じ画像(ジョブ)について従来版(RAGあり)と並べて
+                // 比較表示するための追加フィールド群。track_norag が選択されていないジョブは
+                // hasnorag=falseになり、テンプレート側でこのセクション全体を非表示にする。
+                'hasnorag'                   => new external_value(PARAM_BOOL, 'Whether the no-RAG comparison track was selected'),
+                'norag_status'               => new external_value(PARAM_ALPHANUMEXT, 'Raw no-RAG track status', VALUE_DEFAULT, ''),
+                'norag_statuslabel'          => new external_value(PARAM_RAW, 'Translated no-RAG status label'),
+                'norag_statusclass'         => new external_value(PARAM_ALPHA, 'Bootstrap badge class suffix'),
+                'norag_needsreview'         => new external_value(PARAM_BOOL, 'No-RAG track needs teacher review'),
+                'norag_reviewproblems'      => new external_multiple_structure(
+                    new external_single_structure($noragreviewproblemstructure),
+                    'No-RAG problems awaiting review', VALUE_DEFAULT, []
+                ),
+                'norag_hasreviewproblems'    => new external_value(PARAM_BOOL, 'Has no-RAG reviewable problems'),
+                'norag_confirmedproblems'    => new external_multiple_structure(
+                    new external_single_structure($noragconfirmedproblemstructure),
+                    'Confirmed no-RAG problems (read-only summary)', VALUE_DEFAULT, []
+                ),
+                'norag_hasconfirmedproblems' => new external_value(PARAM_BOOL, 'Has confirmed no-RAG problems'),
+                'norag_awaitingxml'          => new external_value(PARAM_BOOL, 'No-RAG: confirmed, awaiting XML generation'),
+                'norag_processing'           => new external_value(PARAM_BOOL, 'No-RAG: being auto-processed by cron'),
+                'norag_haserror'             => new external_value(PARAM_BOOL, 'No-RAG: has error'),
+                'norag_error_msg'            => new external_value(PARAM_RAW, 'No-RAG error message', VALUE_DEFAULT, ''),
+                'norag_isapproved'           => new external_value(PARAM_BOOL, 'No-RAG: registered in the question bank'),
+                'norag_bankurl'              => new external_value(PARAM_URL, 'No-RAG question bank category URL', VALUE_DEFAULT, ''),
+                'norag_confirmurl'           => new external_value(PARAM_URL, 'No-RAG review confirm endpoint'),
             ])
         );
     }

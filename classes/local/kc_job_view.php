@@ -46,7 +46,15 @@ class kc_job_view {
         // $problems は Stage3レビュー用データ組み立て（$needsreview時）で使うOCR生データの別名。
         $problems = $rawproblems;
 
-        $notstarted     = $kc_status === '' || $kc_status === null;
+        $isempty = $kc_status === '' || $kc_status === null;
+        // kc_status===''は「未着手」と「アップロード時にKC版を選択済みで自動キュー待ち」の
+        // 2通りがありうる（track_kcが選択されていれば、OCR完了直後に自動でタスクがキューされる
+        // ため、教員が何もしなくても始まる）。cronの処理順はAdhoc Taskを1つずつ順番にこなすため、
+        // 従来版やRAGなし版の処理に時間がかかっていると、このジョブのKCタスクはしばらくキューで
+        // 待たされる。その間「未着手」の手動開始ボタンのまま（押せる状態）だと、自動実行中なのか
+        // 本当に未着手なのか教員から区別がつかない。track_kcの有無で出し分ける。
+        $queued         = $isempty && !empty($job->track_kc);
+        $notstarted     = $isempty && empty($job->track_kc);
         $needsreview    = $kc_status === 'feedback_pending' && empty($job->kc_feedback_confirmed);
         $awaitingxml    = $kc_status === 'feedback_pending' && !empty($job->kc_feedback_confirmed);
         $processing     = $kc_status === 'llm_done';
@@ -143,21 +151,33 @@ class kc_job_view {
         $statuslabels  = self::status_labels();
         $statusclasses = self::status_classes();
 
+        // kc_status===''の2通り（真の未着手/自動キュー待ち）は同じ生値なのでマップには無く、
+        // ここで出し分ける。
+        if ($queued) {
+            $statuslabel = get_string('kc_status_queued', 'qbank_stackgen');
+            $statusclass = 'info';
+        } else {
+            $statuslabel = $statuslabels[$kc_status] ?? $kc_status;
+            $statusclass = $statusclasses[$kc_status] ?? 'secondary';
+        }
+
         // バックグラウンドで自動的に進行する可能性がある状態だけポーリング対象にする。
         // レビュー待ち（教員の確定操作待ち）・エラー（再実行ボタン待ち）・承認済みは
-        // それ以上自動では変化しないのでポーリング不要。
-        $polling = $notstarted || $awaitingxml || $processing;
+        // それ以上自動では変化しないのでポーリング不要。真の未着手（track_kc未選択で
+        // タスクが一切キューされていない）もポーリング不要。
+        $polling = $queued || $awaitingxml || $processing;
 
         return [
             'id'             => $job->id,
             'kc_status'      => $kc_status,
             'polling'        => $polling,
-            'statuslabel'    => $statuslabels[$kc_status] ?? $kc_status,
-            'statusclass'    => $statusclasses[$kc_status] ?? 'secondary',
+            'statuslabel'    => $statuslabel,
+            'statusclass'    => $statusclass,
             'problemcount'   => count($problems),
             'ocrsummary'     => $ocrsummary,
             'hasocrsummary'  => !empty($ocrsummary),
             'notstarted'     => $notstarted,
+            'queued'         => $queued,
             'needsreview'    => $needsreview,
             'reviewproblems' => $reviewproblems,
             'hasreviewproblems' => !empty($reviewproblems),

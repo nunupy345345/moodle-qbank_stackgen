@@ -83,6 +83,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             }
 
             $this->maybe_start_kc_track($jobid, $job);
+            $this->maybe_start_norag_track($jobid, $job);
 
             if (empty($job->track_traditional)) {
                 mtrace("[qbank_stackgen] Job {$jobid}: traditional track not selected, stopping after OCR.");
@@ -161,6 +162,22 @@ class generate_stack_question extends \core\task\adhoc_task {
         $task->set_custom_data(['jobid' => $jobid]);
         \core\task\manager::queue_adhoc_task($task, true);
         mtrace("[qbank_stackgen] Job {$jobid}: KC track selected, queued generate_stack_question_kc.");
+    }
+
+    /**
+     * `track_norag` が選択されていれば、別系統のAdhoc Task（generate_stack_question_norag）を
+     * OCR完了直後にキューする。同じ画像について従来版(RAGあり)・RAGなし版・KC版を並べて比較する
+     * ための系統で、`norag_*`列だけを読み書きするため、この系統（従来版）の状態遷移とは独立して進行する。
+     */
+    private function maybe_start_norag_track(int $jobid, \stdClass $job): void {
+        if (empty($job->track_norag)) {
+            return;
+        }
+
+        $task = new generate_stack_question_norag();
+        $task->set_custom_data(['jobid' => $jobid]);
+        \core\task\manager::queue_adhoc_task($task, true);
+        mtrace("[qbank_stackgen] Job {$jobid}: RAGなし比較トラック選択、queued generate_stack_question_norag.");
     }
 
     /**

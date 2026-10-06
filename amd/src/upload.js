@@ -79,9 +79,11 @@ define(['core/notification'], function(Notification) {
 
             var trackTraditional = document.getElementById('stackgen-track-traditional');
             var trackKc          = document.getElementById('stackgen-track-kc');
+            var trackNorag       = document.getElementById('stackgen-track-norag');
 
             function trackSelected() {
-                return (trackTraditional && trackTraditional.checked) || (trackKc && trackKc.checked);
+                return (trackTraditional && trackTraditional.checked) || (trackKc && trackKc.checked)
+                    || (trackNorag && trackNorag.checked);
             }
 
             // folderSubmit/selectedFiles are declared later in this same function (var hoisting);
@@ -100,6 +102,9 @@ define(['core/notification'], function(Notification) {
             }
             if (trackKc) {
                 trackKc.addEventListener('change', onTrackChange);
+            }
+            if (trackNorag) {
+                trackNorag.addEventListener('change', onTrackChange);
             }
 
             if (fileInput && b64Input) {
@@ -205,6 +210,9 @@ define(['core/notification'], function(Notification) {
                                 }
                                 if (trackKc && trackKc.checked) {
                                     body.append('track_kc', '1');
+                                }
+                                if (trackNorag && trackNorag.checked) {
+                                    body.append('track_norag', '1');
                                 }
                                 return fetch(actionUrl, {method: 'POST', body: body, credentials: 'same-origin'});
                             })

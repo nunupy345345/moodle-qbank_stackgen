@@ -113,7 +113,7 @@ $dbjobs = $DB->get_records_select(
     "courseid = ? AND userid = ? AND ocr_result IS NOT NULL AND ocr_result <> ''",
     [$courseid, $USER->id],
     'id DESC',
-    'id, courseid, ocr_result, kc_status, kc_feedback_result, kc_feedback_confirmed, ' .
+    'id, courseid, ocr_result, track_kc, kc_status, kc_feedback_result, kc_feedback_confirmed, ' .
         'kc_xml_result, kc_error_msg, kc_retry_count, kc_question_category_id',
     0, 20
 );

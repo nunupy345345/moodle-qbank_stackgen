@@ -68,6 +68,14 @@
         </form>
         {{/ notstarted }}
 
+        {{# queued }}
+        <button type="button" class="btn btn-sm btn-secondary" disabled>
+            <span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
+            {{# str }} kc_start_button, qbank_stackgen {{/ str }}
+        </button>
+        <small class="text-muted ml-2">{{# str }} kc_queued_label, qbank_stackgen {{/ str }}</small>
+        {{/ queued }}
+
         {{# hasreviewproblems }}
         <div class="stackgen-kc-review-panel"
              data-jobid="{{id}}"

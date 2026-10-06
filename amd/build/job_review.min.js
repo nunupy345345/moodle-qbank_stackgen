@@ -108,6 +108,95 @@ define(['core/notification'], function(Notification) {
         });
     }
 
+    /**
+     * RAGなし比較トラック用。collectProblem()と同じ形(name/questiontext/wronganswers)だが、
+     * パネルがトグル無しで常に表示されているため選択するクラス名(.stackgen-norag-*)のみ異なる。
+     *
+     * @param {Element} problemEl  .stackgen-norag-review-problem element
+     * @returns {Object} {name, questiontext, wronganswers: [{expression, misconception, feedback}, ...]}
+     */
+    function collectNoragProblem(problemEl) {
+        var nameInput = problemEl.querySelector('.stackgen-norag-review-name');
+        var name = nameInput ? nameInput.value.trim() : '';
+
+        var questiontextInput = problemEl.querySelector('.stackgen-norag-review-questiontext');
+        var questiontext = questiontextInput ? questiontextInput.value.trim() : '';
+
+        var rows = problemEl.querySelectorAll('.stackgen-norag-wronganswer-row');
+        var wronganswers = [];
+
+        rows.forEach(function(row) {
+            var expression = row.querySelector('.stackgen-norag-wa-expression').value.trim();
+            if (expression === '') {
+                return;
+            }
+            wronganswers.push({
+                expression: expression,
+                misconception: row.querySelector('.stackgen-norag-wa-misconception').value.trim(),
+                feedback: row.querySelector('.stackgen-norag-wa-feedback').value.trim()
+            });
+        });
+
+        return {name: name, questiontext: questiontext, wronganswers: wronganswers};
+    }
+
+    function handleNoragConfirm(confirmBtn) {
+        var jobid = confirmBtn.getAttribute('data-jobid');
+        var panel = document.querySelector('.stackgen-norag-review-panel[data-jobid="' + jobid + '"]');
+        if (!panel) {
+            return;
+        }
+
+        var sesskey   = panel.getAttribute('data-sesskey');
+        var courseid  = panel.getAttribute('data-courseid');
+        var actionurl = panel.getAttribute('data-confirmurl');
+        var statusEl  = panel.querySelector('.stackgen-norag-review-status');
+
+        var problems = [];
+        panel.querySelectorAll('.stackgen-norag-review-problem').forEach(function(problemEl) {
+            problems.push(collectNoragProblem(problemEl));
+        });
+
+        var body = new URLSearchParams();
+        body.set('sesskey', sesskey);
+        body.set('courseid', courseid);
+        body.set('jobid', jobid);
+        body.set('feedbackdata', JSON.stringify({problems: problems}));
+
+        confirmBtn.disabled = true;
+        if (statusEl) {
+            statusEl.textContent = '';
+        }
+
+        fetch(actionurl, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body.toString(),
+            credentials: 'same-origin'
+        }).then(function(response) {
+            return response.json().then(function(data) {
+                return {ok: response.ok, data: data};
+            });
+        }).then(function(result) {
+            if (!result.ok || !result.data || !result.data.success) {
+                throw new Error((result.data && result.data.message) || 'error');
+            }
+
+            // 確定成功: パネルを隠し、ポーリング（status_poll.js）が次のnorag_status変化を
+            // 検知するまでの間、その場で簡単な「処理中」表示を出す。
+            panel.style.display = 'none';
+
+            var spinner = document.createElement('div');
+            spinner.className = 'text-muted small';
+            spinner.innerHTML = '<span class="spinner-border spinner-border-sm mr-1" '
+                + 'role="status" aria-hidden="true"></span>';
+            panel.insertAdjacentElement('afterend', spinner);
+        }).catch(function(err) {
+            confirmBtn.disabled = false;
+            Notification.alert('', err.message || String(err));
+        });
+    }
+
     function init() {
         document.addEventListener('click', function(e) {
             var toggle = e.target.closest('.stackgen-review-toggle');
@@ -157,6 +246,40 @@ define(['core/notification'], function(Notification) {
             var confirmBtn = e.target.closest('.stackgen-review-confirm');
             if (confirmBtn) {
                 handleConfirm(confirmBtn);
+                return;
+            }
+
+            // RAGなし比較トラック用（同じカード内、別セクション）。
+            var noragAddBtn = e.target.closest('.stackgen-norag-wa-add');
+            if (noragAddBtn) {
+                var noragProblemEl = noragAddBtn.closest('.stackgen-norag-review-problem');
+                var noragProblemIndex = noragAddBtn.getAttribute('data-problem-index');
+                var noragList = noragProblemEl.querySelector(
+                    '.stackgen-norag-wronganswer-list[data-problem-index="' + noragProblemIndex + '"]');
+                var noragTpl = noragProblemEl.querySelector('.stackgen-norag-wronganswer-template');
+                if (!noragList || !noragTpl) {
+                    return;
+                }
+                var noragNextIndex = noragList.children.length;
+                var noragHtml = noragTpl.innerHTML.replace(/__INDEX__/g, noragNextIndex);
+                var noragWrapper = document.createElement('div');
+                noragWrapper.innerHTML = noragHtml.trim();
+                noragList.appendChild(noragWrapper.firstChild);
+                return;
+            }
+
+            var noragRemoveBtn = e.target.closest('.stackgen-norag-wa-remove');
+            if (noragRemoveBtn) {
+                var noragRow = noragRemoveBtn.closest('.stackgen-norag-wronganswer-row');
+                if (noragRow) {
+                    noragRow.parentNode.removeChild(noragRow);
+                }
+                return;
+            }
+
+            var noragConfirmBtn = e.target.closest('.stackgen-norag-review-confirm');
+            if (noragConfirmBtn) {
+                handleNoragConfirm(noragConfirmBtn);
             }
         });
     }

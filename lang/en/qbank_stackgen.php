@@ -22,6 +22,7 @@ $string['upload_folder_submit']          = 'Upload folder contents';
 $string['upload_track_heading']          = 'Generation method (choose one or both)';
 $string['upload_track_traditional']      = 'Generate the traditional version (free-text wrong answers)';
 $string['upload_track_kc']               = 'Also generate the KC version (knowledge-component-based wrong answers, reviewed on a separate page)';
+$string['upload_track_norag']            = 'Also generate the traditional version without RAG (for RAG on/off comparison)';
 $string['upload_error_notrack']          = 'Please select at least one generation method.';
 
 // Job list filter.
@@ -82,6 +83,7 @@ $string['review_page_title']             = 'Review wrong answers & feedback';
 $string['review_instructions']           = 'Review and edit the AI-generated wrong-answer examples and feedback below. Once confirmed, they will be used to generate the PRT (scoring logic) in the STACK XML.';
 $string['review_problem_name']           = 'Question name';
 $string['review_wronganswers_heading']   = 'Wrong-answer examples & feedback';
+$string['confirmed_wronganswers_heading'] = 'Confirmed wrong answers';
 $string['review_wa_expression']          = 'Wrong answer (Maxima expression)';
 $string['review_wa_misconception']       = 'Likely cause';
 $string['review_wa_feedback']            = 'Feedback text';
@@ -100,8 +102,15 @@ $string['import_view_bank']              = 'View in question bank';
 $string['kc_page_title']                 = 'KC diagnosis version (knowledge-component-based wrong answers)';
 $string['kc_instructions']               = 'For each already-OCR\'d image, generate wrong-answer examples grounded in prerequisite knowledge components (KC), then run XML generation through question bank registration once confirmed (a separate track from the existing "Generate from image" page).';
 $string['kc_confirmed_wronganswers_heading'] = 'Confirmed wrong answers (KC-based)';
+
+// No-RAG comparison track (lives in upload.php's existing job card, alongside the traditional
+// (RAG-on) and KC tracks for the same image).
+$string['norag_section_heading']             = 'Traditional version (no RAG, for comparison)';
+$string['norag_confirmed_wronganswers_heading'] = 'Confirmed wrong answers (no RAG)';
 $string['kc_no_jobs']                    = 'No OCR\'d jobs found. Please upload images on the "Generate from image" page first.';
 $string['kc_status_not_started']         = 'Not started';
+$string['kc_status_queued']              = 'Queued';
+$string['kc_queued_label']               = 'Queued. It will start automatically once other jobs finish processing.';
 $string['kc_status_feedback_pending']    = 'Awaiting feedback review';
 $string['kc_status_processing']          = 'Processing automatically...';
 $string['kc_start_button']               = 'Generate KC-based wrong answers';
