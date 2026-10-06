@@ -15,7 +15,7 @@ class llm_generator {
 
     private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-    private const SYSTEM = <<<'SYS'
+    private const SYSTEM_BASE = <<<'SYS'
 あなたはMoodle STACK問題XMLを生成する専門家です。
 ユーザーから数学問題の情報と、教員が確定した誤答例・フィードバックのリストを受け取り、以下のルールに従って
 PRT（採点ロジック）付きの <question type="stack">...</question> ブロックを生成してください。
@@ -74,6 +74,12 @@ PRT（採点ロジック）付きの <question type="stack">...</question> ブ�
 - 積分の答えには必ず + c を付ける（例: x^2/2 + c）
 - questionvariables で ta（正答）を Maxima 式で定義すること
 
+SYS;
+
+    // 誤答判定ノードの分岐方式（通常版・RAGなし版）: 「チェーン型」。
+    // 誤答例の式（wa1, wa2, ...）とリテラルに一致するか ATAlgEquiv で判定し、
+    // 一致した時点でチェーンを打ち切る（早期終了）。
+    private const SYSTEM_CHAIN = <<<'SYS'
 【誤答例が渡された場合の PRT 分岐設計ルール（重要）】
 教員が確定した誤答例が渡された場合、正答判定ノードに続けて、誤答例の数だけ判定ノードを直列に追加すること。
 実際に教員が作り込んだ質の高いPRT問題を分析した結果、誤答には常に0点を与えるのではなく、
@@ -165,7 +171,132 @@ PRT（採点ロジック）付きの <question type="stack">...</question> ブ�
   </node>
   <firstnodename>1</firstnodename>
 </prt>
+SYS;
 
+    // 誤答判定ノードの分岐方式（KC診断版限定）: 「独立判定型」（Phase B Tier1+Tier2）。
+    // 誤答例は「1つの具体的な値」ではなく「そのKCが欠けている答えに共通する構造的特徴」を表す
+    // Maxima述語関数として扱い、一致してもチェーンを打ち切らず必ず全KC診断ノードを評価する。
+    // これにより、1つの誤答から複数KCの欠落を同時に診断できる（STACKのspecificfeedbackは
+    // 通過した全ノードのfeedbackを連結表示するため、複数の該当KCが同時に教員・学生に提示される）。
+    private const SYSTEM_INDEPENDENT = <<<'SYS'
+【誤答例が渡された場合の PRT 分岐設計ルール（KC独立判定モード・重要）】
+教員が確定した誤答例（各誤答に対応する前提知識(KC)の名称・想定原因・フィードバックを含む）が渡された場合、
+正答判定ノードに続けて、誤答例の数だけ「KC診断ノード」を直列に追加すること。
+このモードでは、誤答例は「1つの具体的な値」としてではなく、「そのKCが欠けている答えに共通する
+構造的特徴」を表す Maxima 述語関数（真偽値を返す関数）として扱うこと。1つのKCに一致したからといって
+他のKC診断ノードをスキップしてはならない（必ず全てのKC診断ノードを評価する）。
+
+- ノード1: 学生解答（ans1）と正答（ta）を選択済みの answertest で比較する。
+  - true（正解） → truescoremode "="、truescore 1、truenextnode -1（終端）
+  - false（不正解） → falsescoremode "="、falsescore 0（これ以降の採点の基準値を0に設定する）、
+    falsenextnode は最初のKC診断ノード（誤答例がなければ -1）
+- questionvariables に、誤答例ごとに「構造的特徴を判定する述語関数」を1行ずつ、必ず行頭から
+  書くこと（例: wa1_pred(ex) := ...; のように ":=" で関数定義し ";" で終える。コメントや空行を
+  間に挟まないこと）。
+  この述語は、渡された誤答例の具体的な値（例: x^2/2）そのものと一致するかではなく、
+  その誤りが起こる一般的な条件（例: 積分定数の項を含まない → freeof(c, ex)、次数が正答より低い →
+  hipow(ex, x) < hipow(ta, x) など）を判定するように一般化できる場合は、一般化すること。
+  ただし、正答 ta が単一の具体的な数値・定数（例: inf, 1/2 のように一般化できるパラメータが
+  問題に存在しない場合）であれば、無理に一般化しようとせず is(ex = 誤答の値) のような直接比較で
+  よい（一般化できないものを無理に一般化しようとしてCAS検証で不安定になる方が害が大きい）。
+  **述語の内部で limit(...) を呼び出してはならない。** ta 自体が questionvariables で既に
+  計算済みの値として定義されているため、述語の中で極限を再計算する必要はなく、学生の入力 ex に
+  対して limit を呼ぶと（ex が定数・多項式でない場合など）Maxima の内部エラー（gruntz関連）を
+  引き起こしやすい。構造判定は freeof・hipow・polynomialp・sign・次数比較・直接比較などの
+  軽量な述語関数のみで構成すること。
+  また、**この述語は正答 ta に対して必ず false を返すように設計すること**（正答した学生を誤って
+  KC欠落と判定してはならない）。
+- ノード2以降（誤答例ごとに1ノード、対応する waN_pred を使う）:
+  - answertest: AlgEquiv、sans: waN_pred(ans1)、tans: true、testoptions: (空)
+  - true（その構造的特徴に一致＝そのKCが欠けている兆候） →
+    truescoremode "+"、truescore は 0.9 をKC診断ノードの総数で割った値を基本とし
+    （誤りの重大さに応じて個別に多少増減してよいが、**全ノードのtruescoreの合計が0.9を超えないこと**。
+    1.0は「完全正解」ノード専用の値であり、複数のKC欠落を検出した場合でも満点になってはならない）、
+    truefeedback に教員が確定したフィードバック文をそのまま使う（HTML可）。
+  - false（一致しない） → falsescoremode "+"、falsescore 0（スコアは変化させない）、
+    falsefeedback は空（静かに素通りする）。
+  - **true・falseのどちらであっても、truenextnode・falsenextnode は両方とも次のKC診断ノードを
+    指すこと**（最後のKC診断ノードだけ、true・false両方を -1 にして終端し、その場合の
+    falsefeedback は「不正解です。」等の汎用フィードバックにする）。チェーン型のように
+    一致した時点で打ち切ってはならない。
+- 誤答例が渡されなかった場合は、従来通り正誤2択（AlgEquiv 1ノード）で構成すること。
+
+【誤答例ありの場合の PRT 構造例（KC独立判定モード・積分・誤答例2個: wa1, wa2）】
+※ node1 の answertest は「Answer Test選択ルール」に従って問題タイプごとに変わる（この例は積分なので Int）。
+   node2以降のKC診断ノードは常に ATAlgEquiv（述語関数の戻り値がtrueと一致するか）でよい。
+※ 下例では紙幅の都合で省略しているが、実際の出力では各 <node> に
+   <description></description> <truepenalty></truepenalty> <falsepenalty></falsepenalty> も含めること。
+<questionvariables><text>
+ta: x^2/2 + c;
+wa1_pred(ex) := freeof(c, ex);
+wa2_pred(ex) := hipow(ex, x) < hipow(ta, x);
+</text></questionvariables>
+...
+<prt>
+  <name>prt1</name>
+  <value>1</value>
+  <autosimplify>1</autosimplify>
+  <feedbackstyle>1</feedbackstyle>
+  <feedbackvariables><text></text></feedbackvariables>
+  <node>
+    <name>1</name>
+    <answertest>Int</answertest>
+    <sans>ans1</sans>
+    <tans>ta</tans>
+    <testoptions>x</testoptions>
+    <quiet>0</quiet>
+    <truescoremode>=</truescoremode>
+    <truescore>1</truescore>
+    <truenextnode>-1</truenextnode>
+    <trueanswernote>prt1-1-T</trueanswernote>
+    <truefeedback format="html"><text><![CDATA[<p>正解です。</p>]]></text></truefeedback>
+    <falsescoremode>=</falsescoremode>
+    <falsescore>0</falsescore>
+    <falsenextnode>2</falsenextnode>
+    <falseanswernote>prt1-1-F</falseanswernote>
+    <falsefeedback format="html"><text></text></falsefeedback>
+  </node>
+  <node>
+    <name>2</name>
+    <answertest>AlgEquiv</answertest>
+    <sans>wa1_pred(ans1)</sans>
+    <tans>true</tans>
+    <testoptions></testoptions>
+    <quiet>0</quiet>
+    <truescoremode>+</truescoremode>
+    <truescore>0.45</truescore>
+    <truenextnode>3</truenextnode>
+    <trueanswernote>prt1-2-T</trueanswernote>
+    <truefeedback format="html"><text><![CDATA[<p>積分定数 C を忘れています。忘れずに付け加えましょう。</p>]]></text></truefeedback>
+    <falsescoremode>+</falsescoremode>
+    <falsescore>0</falsescore>
+    <falsenextnode>3</falsenextnode>
+    <falseanswernote>prt1-2-F</falseanswernote>
+    <falsefeedback format="html"><text></text></falsefeedback>
+  </node>
+  <node>
+    <name>3</name>
+    <answertest>AlgEquiv</answertest>
+    <sans>wa2_pred(ans1)</sans>
+    <tans>true</tans>
+    <testoptions></testoptions>
+    <quiet>0</quiet>
+    <truescoremode>+</truescoremode>
+    <truescore>0.45</truescore>
+    <truenextnode>-1</truenextnode>
+    <trueanswernote>prt1-3-T</trueanswernote>
+    <truefeedback format="html"><text><![CDATA[<p>べき乗の積分公式（次数を1つ上げて次数で割る）を確認しましょう。</p>]]></text></truefeedback>
+    <falsescoremode>+</falsescoremode>
+    <falsescore>0</falsescore>
+    <falsenextnode>-1</falsenextnode>
+    <falseanswernote>prt1-3-F</falseanswernote>
+    <falsefeedback format="html"><text><![CDATA[<p>不正解です。</p>]]></text></falsefeedback>
+  </node>
+  <firstnodename>1</firstnodename>
+</prt>
+SYS;
+
+    private const SYSTEM_TEMPLATE = <<<'SYS'
 【XML 全体テンプレート（誤答例がない場合はこの1ノード構成に従うこと）】
 <question type="stack">
   <name><text>問題 N</text></name>
@@ -250,10 +381,16 @@ SYS;
      * @param string $lasterror  直前の試行がCAS検証(Stage 5)で失敗した場合のエラー内容。
      *                           再生成時にLLMへ伝え、同じ間違いを繰り返しにくくする。空でもよい。
      * @param array $ragexamples  Step 6 RAG: $problems と同じ順序で、rag_search::search() の結果配列を並べたもの。
+     * @param string $mode  PRT誤答判定ノードの分岐方式。'chain'（デフォルト、通常版・RAGなし版）=
+     *                       誤答例とリテラルに一致したら打ち切る早期終了チェーン。'independent'（KC診断版）=
+     *                       誤答例を構造的特徴の述語関数として扱い、全KC診断ノードを必ず評価する独立判定。
      * @return array  ['xml' => "<?xml...><quiz>...</quiz>", 'cot' => "問題ごとの思考過程を連結したテキスト"]
      * @throws \moodle_exception APIキー未設定・通信エラー・XML不正のとき
      */
-    public function run(array $problems, array $feedbackproblems = [], string $lasterror = '', array $ragexamples = []): array {
+    public function run(
+        array $problems, array $feedbackproblems = [], string $lasterror = '', array $ragexamples = [],
+        string $mode = 'chain'
+    ): array {
         $api_key = get_config('qbank_stackgen', 'google_api_key');
         if (empty($api_key)) {
             throw new \moodle_exception('error_llm_api_key_missing', 'qbank_stackgen');
@@ -265,7 +402,7 @@ SYS;
             $name         = $feedbackproblems[$i]['name'] ?? '';
             $wronganswers = $feedbackproblems[$i]['wronganswers'] ?? [];
             [$xml, $cot]  = $this->generate_one(
-                $api_key, $problem, $i + 1, $wronganswers, $name, $lasterror, $ragexamples[$i] ?? []);
+                $api_key, $problem, $i + 1, $wronganswers, $name, $lasterror, $ragexamples[$i] ?? [], $mode);
             $question_xmls[] = $xml;
             if ($cot !== '') {
                 $cots[] = "--- 問題{$i}のCoT ---\n{$cot}";
@@ -287,11 +424,12 @@ SYS;
      * @param string $name  教員がレビュー画面で確定した問題名。空ならLLM任せの名前をそのまま使う。
      * @param string $lasterror  直前の試行のCAS検証エラー内容。空でなければ再生成時にLLMへ伝える。
      * @param array $examples  Step 6 RAG: この問題に類似した過去の良問（rag_search::search()の結果）
+     * @param string $mode  'chain'（既定）または'independent'（KC診断版）。run()のモード引数を参照。
      * @return array [xml, cot]
      */
     private function generate_one(
         string $api_key, array $problem, int $num, array $wronganswers, string $name = '', string $lasterror = '',
-        array $examples = []
+        array $examples = [], string $mode = 'chain'
     ): array {
         $qtype     = $problem['question_type'] ?? 'other';
         $variables = $problem['variables']     ?? ['x'];
@@ -336,7 +474,7 @@ SYS;
         $user_msg .= self::build_rag_block($examples);
 
         $body = json_encode([
-            'system_instruction' => ['parts' => [['text' => self::SYSTEM]]],
+            'system_instruction' => ['parts' => [['text' => self::build_system($mode)]]],
             'contents'           => [['parts' => [['text' => $user_msg]]]],
             'generationConfig'   => ['temperature' => 0.1],
         ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
@@ -429,6 +567,17 @@ SYS;
                 . "truescoreの段階=[{$scores}]\n";
         }
         return $block;
+    }
+
+    /**
+     * $mode に応じたPRT分岐設計ルール（誤答判定ノードの部分のみ差し替え）を組み込んだ
+     * システムプロンプト全体を組み立てる。
+     *
+     * @param string $mode 'chain'（既定）または'independent'
+     */
+    private static function build_system(string $mode): string {
+        $rules = $mode === 'independent' ? self::SYSTEM_INDEPENDENT : self::SYSTEM_CHAIN;
+        return self::SYSTEM_BASE . $rules . "\n" . self::SYSTEM_TEMPLATE;
     }
 
     /**

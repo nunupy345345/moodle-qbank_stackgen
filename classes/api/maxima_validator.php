@@ -63,13 +63,17 @@ class maxima_validator {
             return ["問題{$qnum}: questionvariables に ta の定義が見つかりません"];
         }
 
-        // wa1, wa2, ... のような誤答例変数名を抽出（ta以外の代入先）。
+        // wa1, wa2, ... のような誤答例変数名を抽出（ta以外の代入先。チェーン型/従来版・RAGなし版用）。
         preg_match_all('/^\s*(wa\d+)\s*:/m', $qvtext, $m);
         $wanames = $m[1];
 
+        // wa1_pred(ex):=..., wa2_pred(ex):=... のような誤答判定述語関数名を抽出（KC診断版の独立判定モード用）。
+        preg_match_all('/^\s*(wa\d+_pred)\s*\(\s*ex\s*\)\s*:=/m', $qvtext, $pm);
+        $prednames = $pm[1];
+
         $errors = [];
 
-        if (empty($wanames)) {
+        if (empty($wanames) && empty($prednames)) {
             // 誤答例なし: ta単体の構文チェックのみ。
             $response = $this->call_goemaxima_with_retry("{$qvtext} ta;");
             if ($this->looks_like_error($response)) {
@@ -93,6 +97,26 @@ class maxima_validator {
                 $errors[] = "問題{$qnum}: 誤答例 {$waname} が正答 ta と数式的に一致しています（PRTの誤答判定が機能しません）";
             } else if ($result !== 'false') {
                 $errors[] = "問題{$qnum}: {$waname} の検証結果を判定できませんでした（応答: {$result}）";
+            }
+        }
+
+        // KC診断版(独立判定モード)の安全チェック: 各誤答判定述語は、正答taに対して必ずfalseを
+        // 返さなければならない（正答した学生を誤ってKC欠落と判定してはならないため）。
+        foreach ($prednames as $predname) {
+            $input = "{$qvtext} is(not({$predname}(ta)));";
+            $response = $this->call_goemaxima_with_retry($input);
+
+            if ($this->looks_like_error($response)) {
+                $errors[] = "問題{$qnum}: ta / {$predname} の構文エラー: " . $this->extract_error_detail($response);
+                continue;
+            }
+
+            $result = trim((string)$this->extract_last_result($response));
+            if ($result === 'false') {
+                $errors[] = "問題{$qnum}: 誤答判定述語 {$predname} が正答 ta に対してtrueを返しています"
+                    . "（正答した学生を誤ってKC欠落と判定してしまいます）";
+            } else if ($result !== 'true') {
+                $errors[] = "問題{$qnum}: {$predname} の検証結果を判定できませんでした（応答: {$result}）";
             }
         }
 

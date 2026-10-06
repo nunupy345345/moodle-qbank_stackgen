@@ -99,6 +99,7 @@ $string['review_error_wrongstatus']      = 'このジョブは現在レビュー
 $string['review_error_invalid']          = '不正なフィードバックデータです。';
 $string['review_awaiting_xml']           = 'バックグラウンドでSTACK XMLを生成中です。しばらくお待ちください。';
 $string['import_category_name']          = 'STACKGen自動生成';
+$string['kc_import_category_name']       = 'STACKGen自動生成（KC診断版）';
 $string['import_success']                = '問題バンクに登録済みです。';
 $string['import_view_bank']              = '問題バンクで確認';
 

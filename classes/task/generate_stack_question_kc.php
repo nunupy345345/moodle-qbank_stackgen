@@ -148,7 +148,9 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
         for ($attempt = 1; $attempt <= $maxretry; $attempt++) {
             try {
                 $generator = new \qbank_stackgen\api\llm_generator();
-                $output    = $generator->run($problems, $feedbackproblems, $lasterror, $ragresults);
+                // KC診断版はPhase B(独立判定モード): 誤答判定ノードを構造的特徴の述語関数として扱い、
+                // 1つのKCに一致しても他のKC診断ノードを打ち切らない（llm_generator::SYSTEM_INDEPENDENT）。
+                $output    = $generator->run($problems, $feedbackproblems, $lasterror, $ragresults, 'independent');
             } catch (\Throwable $e) {
                 $DB->update_record('qbank_stackgen_jobs', (object)[
                     'id'           => $jobid,
@@ -227,7 +229,8 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
                 'xml_result' => $job->kc_xml_result,
                 'courseid'   => $job->courseid,
             ];
-            $result = \qbank_stackgen\question_importer::import($importjob);
+            $result = \qbank_stackgen\question_importer::import(
+                $importjob, \qbank_stackgen\question_importer::CATEGORY_MARKER_KC);
 
             $DB->update_record('qbank_stackgen_jobs', (object)[
                 'id'                       => $jobid,
