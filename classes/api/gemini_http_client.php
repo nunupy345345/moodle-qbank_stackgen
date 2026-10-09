@@ -23,7 +23,7 @@ class gemini_http_client {
      * @return string  HTTP 200 のレスポンスボディ
      * @throws \moodle_exception 最終試行まで失敗したとき
      */
-    public static function post(string $url, string $body, string $context, int $timeout = 60): string {
+    public static function post(string $url, string $body, string $context, int $timeout = 90): string {
         $lastcurlerror = '';
         $lasthttpcode  = 0;
         $lastresponse  = '';

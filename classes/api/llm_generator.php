@@ -35,6 +35,8 @@ PRT（採点ロジック）付きの <question type="stack">...</question> ブ�
    - falsenextnode / truenextnode が参照するノード名がすべて実在するか（終端は -1）
    - 問題文・フィードバック内の数式区切りがすべて \( \) または \[ \] か（$...$ は不可）
    - questionvariables で定義した wa1, wa2, ... がすべていずれかのノードの tans で使われているか
+   - すべての開始タグと終了タグの名前が一致しているか（例: <truescore>...</truescoremode> の
+     ように、開始タグと違うタグ名で閉じてしまっているところがないか、出力全体を見直すこと）
 
 【必須ルール】
 - <prt> 要素を必ず1つ以上含めること。PRT のない <question> は不正な出力である。
@@ -204,6 +206,27 @@ SYS;
   対して limit を呼ぶと（ex が定数・多項式でない場合など）Maxima の内部エラー（gruntz関連）を
   引き起こしやすい。構造判定は freeof・hipow・polynomialp・sign・次数比較・直接比較などの
   軽量な述語関数のみで構成すること。
+  **述語の中で、問題の自由変数（x など）が残ったままの式どうしを生の大小・等号比較
+  （<, >, <=, >=, = など）で直接比較してはならない。** 例えば ex>0 や ex=ta のように
+  x が消えていない式を比較すると、Maxima の is() はその真偽を決定できず unknown を返し、
+  CAS検証が必ず失敗する。比較する前に freeof・hipow・次数比較・係数抽出など、
+  x に依存しない「数値・真偽が確定する量」まで落としてから比較すること。
+  **連鎖比較（例: 0 < ex < ta のような a < b < c 形式）を書いてはならない。** Maxima には
+  連鎖比較演算子は無く構文エラーになる。必要な場合は wa1_pred(ex) := (ex > 0) and (ex < ta) の
+  ように and で明示的につなぐこと。
+  **ある式を特定の値で評価したい場合、func(x=1) のような関数呼び出し風の代入構文を使っては
+  ならない。** func が := で定義された関数であればエラーになり、そうでなければ代入されずに
+  黙って式がそのまま残る。正しくは ev(func, x=1) または subst(x=1, func) を使うこと。
+  **has(ex, 関数名) を使ってはならない。** この実行環境のMaximaには has が存在せず、
+  呼び出しても評価されずに式がそのまま残ってしまい（エラーにもならず無言で失敗する）、
+  CAS検証が必ず unknown になる。「式が特定の関数・記号を含むかどうか」を判定したい場合は、
+  代わりに freeof(関数名, ex) を使うこと（含まない場合に true を返す。含むかどうかで
+  判定を書きたい場合は not(freeof(関数名, ex)) とする）。
+  **coeff(ex, 項) で特定の項の係数を取り出す判定は避けること。** Maximaは式を内部的に
+  正規化・並べ替えるため、LLMが書いた項の見た目（例: x*sqrt(a^2+x^2)）がtaの内部表現と
+  一字一句一致しないと coeff() は 0 を返してしまい、意図しない誤判定（正答に対してtrueを
+  返す等）につながりやすい。次数・freeof・符号・直接比較など、内部表現の並び順に依存しない
+  判定方法を優先すること。
   また、**この述語は正答 ta に対して必ず false を返すように設計すること**（正答した学生を誤って
   KC欠落と判定してはならない）。
 - ノード2以降（誤答例ごとに1ノード、対応する waN_pred を使う）:
@@ -294,6 +317,27 @@ wa2_pred(ex) := hipow(ex, x) < hipow(ta, x);
   </node>
   <firstnodename>1</firstnodename>
 </prt>
+SYS;
+
+    private const SYSTEM_INDEPENDENT_SELFCHECK = <<<'SYS'
+
+【KC診断述語（waN_pred）の自己チェック（出力前に必ず実施すること）】
+questionvariables に waN_pred(ex) := ... を書き終えたら、<question> ブロックを出力する前に、
+以下を1つずつ実際に頭の中で検算してから出力すること。検算せずに「たぶん大丈夫」で出力しないこと。
+1. 括弧の対応: 各 waN_pred の定義で "(" と ")" の数を数え、一致しているか確認する
+   （1つでもずれていたら構文エラーになる）。
+2. ta を代入した場合の結果: waN_pred(ta) を手計算し、必ず false になることを確認する
+   （true になる場合はその述語の条件を書き直すこと。正答した学生を誤診断してしまう）。
+3. 自由変数の残存チェック: 述語内で比較演算子（<, >, <=, >=, =）を使っている箇所について、
+   その両辺に問題の自由変数（x など）が式として残っていないか確認する。残っている場合は
+   その比較をそのまま使わず、freeof・hipow・次数比較など変数に依存しない量に落としてから
+   比較するよう述語を書き直すこと（Maximaの is() は変数が残った式の大小を決定できず
+   unknown を返し、CAS検証が必ず失敗する）。
+4. 連鎖比較・代入構文の確認: a < b < c のような連鎖比較や func(x=1) のような関数呼び出し風の
+   代入が紛れ込んでいないか、該当箇所をもう一度読み直して確認する。
+5. 禁止関数・脆い判定の確認: has( ) を使っていないか（代わりに freeof を使うこと。has は
+   この環境では評価されず常に unknown の原因になる）。coeff( ) で特定の項の係数を取り出す
+   判定を書いていないか（Maximaの内部正規化により意図せず0を返しやすく、誤判定の原因になる）。
 SYS;
 
     private const SYSTEM_TEMPLATE = <<<'SYS'
@@ -426,8 +470,11 @@ SYS;
      * @param array $examples  Step 6 RAG: この問題に類似した過去の良問（rag_search::search()の結果）
      * @param string $mode  'chain'（既定）または'independent'（KC診断版）。run()のモード引数を参照。
      * @return array [xml, cot]
+     *
+     * public: run() が全問一括生成に使うほか、呼び出し元タスク（KC診断版）が
+     * CAS検証に失敗した問題だけをピンポイントで再生成するためにも直接呼び出す。
      */
-    private function generate_one(
+    public function generate_one(
         string $api_key, array $problem, int $num, array $wronganswers, string $name = '', string $lasterror = '',
         array $examples = [], string $mode = 'chain'
     ): array {
@@ -521,6 +568,15 @@ SYS;
             $xml = preg_replace('/\$\$(.+?)\$\$/s', '\\\\[$1\\\\]', $xml);
             $xml = preg_replace('/(?<!\\\\)\$(.+?)(?<!\\\\)\$/s', '\\\\($1\\\\)', $xml);
 
+            // 保険: <truescore>...</truescoremode> のような、名前が似た隣接タグ（truescore/
+            // truescoremode、falsescore/falsescoremode）の開始・終了タグ取り違えを機械的に修正する。
+            // プロンプトでこの具体例を名指しで注意しても、LLMが再発させることを実機で確認したため
+            // （同じ誤りが複数ジョブで再現）、プロンプト指示に頼らずここで決定的に修復する。
+            $xml = preg_replace('/<truescore>([^<]*)<\/truescoremode>/', '<truescore>$1</truescore>', $xml);
+            $xml = preg_replace('/<truescoremode>([^<]*)<\/truescore>/', '<truescoremode>$1</truescoremode>', $xml);
+            $xml = preg_replace('/<falsescore>([^<]*)<\/falsescoremode>/', '<falsescore>$1</falsescore>', $xml);
+            $xml = preg_replace('/<falsescoremode>([^<]*)<\/falsescore>/', '<falsescoremode>$1</falsescoremode>', $xml);
+
             // 最低限の門番チェック: 採点不能な問題を問題バンクに入れない。
             // (STACKはPRTゼロの問題もエラーなしでインポートしてしまうため、ここで止める)
             $fatal = [];
@@ -577,7 +633,8 @@ SYS;
      */
     private static function build_system(string $mode): string {
         $rules = $mode === 'independent' ? self::SYSTEM_INDEPENDENT : self::SYSTEM_CHAIN;
-        return self::SYSTEM_BASE . $rules . "\n" . self::SYSTEM_TEMPLATE;
+        $selfcheck = $mode === 'independent' ? self::SYSTEM_INDEPENDENT_SELFCHECK : '';
+        return self::SYSTEM_BASE . $rules . $selfcheck . "\n" . self::SYSTEM_TEMPLATE;
     }
 
     /**

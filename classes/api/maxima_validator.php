@@ -48,6 +48,30 @@ class maxima_validator {
     }
 
     /**
+     * 1問分の <question type="stack">...</question> ブロック単体を検証する。
+     * KC診断版の部分リトライ（CAS検証に落ちた問題だけを再生成・再検証する）で使う。
+     *
+     * @param string $questionxml  単一の <question>...</question> ブロック
+     * @param int    $qnum  エラーメッセージに含める問題番号
+     * @return array{valid: bool, errors: string[]}
+     * @throws \moodle_exception goemaximaとの通信エラーのとき
+     */
+    public function validate_one(string $questionxml, int $qnum): array {
+        $dom = new \DOMDocument();
+        if (!@$dom->loadXML($questionxml)) {
+            return ['valid' => false, 'errors' => ["問題{$qnum}: 生成されたXMLがパースできません（整形式のXMLではありません）"]];
+        }
+
+        $questions = $dom->getElementsByTagName('question');
+        if ($questions->length === 0) {
+            return ['valid' => false, 'errors' => ["問題{$qnum}: <question> 要素が見つかりません"]];
+        }
+
+        $errors = $this->validate_question($questions->item(0), $qnum);
+        return ['valid' => empty($errors), 'errors' => $errors];
+    }
+
+    /**
      * @return string[] このquestionで見つかったエラーメッセージ（なければ空配列）
      */
     private function validate_question(\DOMElement $question, int $qnum): array {
@@ -102,6 +126,7 @@ class maxima_validator {
 
         // KC診断版(独立判定モード)の安全チェック: 各誤答判定述語は、正答taに対して必ずfalseを
         // 返さなければならない（正答した学生を誤ってKC欠落と判定してはならないため）。
+        $freevars = null;
         foreach ($prednames as $predname) {
             $input = "{$qvtext} is(not({$predname}(ta)));";
             $response = $this->call_goemaxima_with_retry($input);
@@ -112,15 +137,89 @@ class maxima_validator {
             }
 
             $result = trim((string)$this->extract_last_result($response));
+            if ($result === 'true') {
+                continue;
+            }
             if ($result === 'false') {
                 $errors[] = "問題{$qnum}: 誤答判定述語 {$predname} が正答 ta に対してtrueを返しています"
                     . "（正答した学生を誤ってKC欠落と判定してしまいます）";
-            } else if ($result !== 'true') {
-                $errors[] = "問題{$qnum}: {$predname} の検証結果を判定できませんでした（応答: {$result}）";
+                continue;
             }
+
+            // is() が symbolic に真偽を決定できなかった場合（応答: unknown 等）。ta に自由変数
+            // （x, c など）が残っていると、Maximaの is() は一般にその大小・真偽を決定できないため、
+            // 具体的な数値を代入した上で再検証する（STACKの等価判定でも使われる数値サンプリング）。
+            if ($freevars === null) {
+                $freevars = $this->free_vars($qvtext);
+            }
+            $numericresult = $this->check_predicate_numeric($qvtext, $predname, $freevars);
+            if ($numericresult === 'true') {
+                continue;
+            }
+            if ($numericresult === 'false') {
+                $errors[] = "問題{$qnum}: 誤答判定述語 {$predname} が正答 ta に対してtrueを返しています"
+                    . "（正答した学生を誤ってKC欠落と判定してしまいます・数値代入検証）";
+                continue;
+            }
+            $errors[] = "問題{$qnum}: {$predname} の検証結果を判定できませんでした"
+                . "（応答: {$result}、数値代入検証でも判定不能）";
         }
 
         return $errors;
+    }
+
+    /**
+     * ta に含まれる自由変数名の一覧を取得する（例: [x, c]）。取得できなければ空配列。
+     */
+    private function free_vars(string $qvtext): array {
+        $response = $this->call_goemaxima_with_retry("{$qvtext} listofvars(ta);");
+        if ($this->looks_like_error($response)) {
+            return [];
+        }
+        $result = trim((string)$this->extract_last_result($response));
+        if (preg_match('/^\[(.*)\]$/', $result, $m) && trim($m[1]) !== '') {
+            return array_values(array_filter(array_map('trim', explode(',', $m[1])), 'strlen'));
+        }
+        return [];
+    }
+
+    /**
+     * is() が symbolic に決定できなかった述語を、ta の自由変数に具体的な数値を代入した上で
+     * 複数パターン再検証する。いずれかのサンプルで定義域エラーにならず true/false が決まれば
+     * その結果を返す（代入後は自由変数が残らないため、Maximaは通常は確定的に判定できる）。
+     * 全サンプルで判定不能だった場合は 'unknown' を返す。
+     */
+    private function check_predicate_numeric(string $qvtext, string $predname, array $vars): string {
+        if (empty($vars)) {
+            return 'unknown';
+        }
+
+        // ゼロ除算・負数の平方根・対数の定義域外などを避けつつ、符号・値の異なる複数パターンを試す。
+        $samplesets = [
+            [2, 3, -2, 5, 7],
+            [-3, 2, 5, -2, 2],
+            [4, -1, 3, 2, -5],
+        ];
+
+        foreach ($samplesets as $values) {
+            $substs = [];
+            foreach ($vars as $i => $var) {
+                $substs[] = "{$var}=" . ($values[$i] ?? ($i + 2));
+            }
+            $substlist = implode(',', $substs);
+            $input = "{$qvtext} is(not({$predname}(subst([{$substlist}], ta))));";
+            $response = $this->call_goemaxima_with_retry($input);
+
+            if ($this->looks_like_error($response)) {
+                continue;
+            }
+            $result = trim((string)$this->extract_last_result($response));
+            if ($result === 'true' || $result === 'false') {
+                return $result;
+            }
+        }
+
+        return 'unknown';
     }
 
     /**

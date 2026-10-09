@@ -140,52 +140,95 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
     private function run_xml_stage(int $jobid, array $problems, array $feedbackproblems, array $ragresults = []): void {
         global $DB;
 
-        $maxretry  = max(1, (int)(get_config('qbank_stackgen', 'max_retry') ?: 3));
+        $maxretry = max(1, (int)(get_config('qbank_stackgen', 'max_retry') ?: 3));
+        $apikey   = get_config('qbank_stackgen', 'google_api_key');
+        if (empty($apikey)) {
+            $DB->update_record('qbank_stackgen_jobs', (object)[
+                'id'           => $jobid,
+                'kc_status'    => 'requires_manual_review',
+                'kc_error_msg' => 'KC Stage4 LLM error: google_api_key が設定されていません',
+                'timemodified' => time(),
+            ]);
+            return;
+        }
+
         $validator = new \qbank_stackgen\api\maxima_validator();
-        $lasterror = '';
+        $generator = new \qbank_stackgen\api\llm_generator();
         $count     = count($problems);
 
+        // 1問ごとに「確定済み（CAS検証OK）のXML」を保持し、リトライのたびに全問ゼロからGeminiへ
+        // 再生成させるのではなく、まだ不合格の問題だけを再生成・再検証する（失敗していない問題を
+        // 無駄にAPI呼び出し・CAS検証し直さないことで、複数問ジョブのリトライコストを大幅に削減する）。
+        $confirmedxml = array_fill(0, $count, null);
+        $debugxml     = array_fill(0, $count, null); // 不合格でも直近の生成結果をデバッグ表示用に保持
+        $cots         = array_fill(0, $count, '');
+        $problemerror = array_fill(0, $count, ''); // 問題ごとの直近のエラー（再生成時にLLMへ伝える）
+        $pending      = range(0, $count - 1);
+        $lasterror    = '';
+        $laststage    = '';
+
         for ($attempt = 1; $attempt <= $maxretry; $attempt++) {
-            try {
-                $generator = new \qbank_stackgen\api\llm_generator();
-                // KC診断版はPhase B(独立判定モード): 誤答判定ノードを構造的特徴の述語関数として扱い、
-                // 1つのKCに一致しても他のKC診断ノードを打ち切らない（llm_generator::SYSTEM_INDEPENDENT）。
-                $output    = $generator->run($problems, $feedbackproblems, $lasterror, $ragresults, 'independent');
-            } catch (\Throwable $e) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
-                    'id'           => $jobid,
-                    'kc_status'    => 'requires_manual_review',
-                    'kc_error_msg' => 'KC Stage4 LLM error: ' . $e->getMessage(),
-                    'timemodified' => time(),
-                ]);
-                mtrace("[qbank_stackgen] KC Job {$jobid}: LLM failed (attempt {$attempt}): " . $e->getMessage());
-                return;
+            foreach ($pending as $i) {
+                $wronganswers = $feedbackproblems[$i]['wronganswers'] ?? [];
+                $name         = $feedbackproblems[$i]['name'] ?? '';
+                try {
+                    [$xml, $cot] = $generator->generate_one(
+                        $apikey, $problems[$i], $i + 1, $wronganswers, $name,
+                        $problemerror[$i], $ragresults[$i] ?? [], 'independent');
+                    $debugxml[$i] = $xml;
+                    $cots[$i]     = $cot;
+                } catch (\Throwable $e) {
+                    $laststage = 'Stage4 LLM error';
+                    $lasterror = "問題{$i}: " . $e->getMessage();
+                    $debugxml[$i] = null;
+                    // この問題は生成自体に失敗したので、このattempt内では検証段階に進めない
+                    // （$debugxml[$i]===nullのまま次のpending判定でリトライ対象に残る）。
+                }
             }
 
-            try {
-                $result = $validator->validate($output['xml']);
-            } catch (\Throwable $e) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
-                    'id'           => $jobid,
-                    'kc_status'    => 'requires_manual_review',
-                    'kc_xml_result' => $output['xml'],
-                    'kc_llm_cot'    => $output['cot'],
-                    'kc_error_msg'  => 'KC Stage5 CAS validator error: ' . $e->getMessage(),
-                    'timemodified' => time(),
-                ]);
-                mtrace("[qbank_stackgen] KC Job {$jobid}: CAS validator unreachable: " . $e->getMessage());
-                return;
+            $newpending = [];
+            foreach ($pending as $i) {
+                if ($debugxml[$i] === null) {
+                    $newpending[] = $i;
+                    continue;
+                }
+                try {
+                    $result = $validator->validate_one($debugxml[$i], $i + 1);
+                } catch (\Throwable $e) {
+                    $laststage = 'Stage5 CAS validator error';
+                    $lasterror = "問題" . ($i + 1) . ": " . $e->getMessage();
+                    $problemerror[$i] = $lasterror;
+                    $newpending[] = $i;
+                    continue;
+                }
+                if ($result['valid']) {
+                    $confirmedxml[$i] = $debugxml[$i];
+                    continue;
+                }
+                $laststage = 'Stage5 CAS validation failed';
+                $lasterror = implode(' / ', $result['errors']);
+                $problemerror[$i] = $lasterror;
+                $newpending[] = $i;
             }
 
-            if ($result['valid']) {
+            $DB->update_record('qbank_stackgen_jobs', (object)[
+                'id'             => $jobid,
+                'kc_xml_result'  => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<quiz>\n"
+                    . implode("\n\n", array_filter(array_map(
+                        fn($i) => $confirmedxml[$i] ?? $debugxml[$i], range(0, $count - 1))))
+                    . "\n</quiz>",
+                'kc_llm_cot'     => implode("\n\n", array_filter($cots)),
+                'kc_retry_count' => $attempt,
+                'kc_error_msg'   => empty($newpending) ? null
+                    : "KC {$laststage} (attempt {$attempt}/{$maxretry}, 残り" . count($newpending) . "/{$count}問): {$lasterror}",
+                'timemodified'   => time(),
+            ]);
+
+            if (empty($newpending)) {
                 $DB->update_record('qbank_stackgen_jobs', (object)[
-                    'id'            => $jobid,
-                    'kc_status'     => 'llm_done',
-                    'kc_xml_result' => $output['xml'],
-                    'kc_llm_cot'    => $output['cot'],
-                    'kc_retry_count' => $attempt - 1,
-                    'kc_error_msg'  => null,
-                    'timemodified'  => time(),
+                    'id'             => $jobid,
+                    'kc_status'      => 'llm_done',
+                    'timemodified'   => time(),
                 ]);
                 mtrace("[qbank_stackgen] KC Job {$jobid}: CAS validation OK on attempt {$attempt}"
                     . " ({$count} question(s)).");
@@ -193,23 +236,15 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
                 return;
             }
 
-            $lasterror = implode(' / ', $result['errors']);
-            $DB->update_record('qbank_stackgen_jobs', (object)[
-                'id'            => $jobid,
-                'kc_xml_result' => $output['xml'],
-                'kc_llm_cot'    => $output['cot'],
-                'kc_retry_count' => $attempt,
-                'kc_error_msg'  => 'KC Stage5 CAS validation failed: ' . $lasterror,
-                'timemodified'  => time(),
-            ]);
-            mtrace("[qbank_stackgen] KC Job {$jobid}: CAS validation failed (attempt {$attempt}/{$maxretry}): "
-                . $lasterror);
+            mtrace("[qbank_stackgen] KC Job {$jobid}: CAS validation failed (attempt {$attempt}/{$maxretry}), "
+                . "残り" . count($newpending) . "/{$count}問: " . $lasterror);
+            $pending = $newpending;
         }
 
         $DB->update_record('qbank_stackgen_jobs', (object)[
             'id'           => $jobid,
             'kc_status'    => 'requires_manual_review',
-            'kc_error_msg' => "KC Stage5 CAS validation failed after {$maxretry} attempts: {$lasterror}",
+            'kc_error_msg' => "KC {$laststage} after {$maxretry} attempts (未解決" . count($pending) . "/{$count}問): {$lasterror}",
             'timemodified' => time(),
         ]);
         mtrace("[qbank_stackgen] KC Job {$jobid}: CAS validation failed {$maxretry} times, requires manual review.");
