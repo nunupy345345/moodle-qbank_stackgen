@@ -17,33 +17,6 @@ if ($ADMIN->fulltree) {
         PARAM_RAW_TRIMMED
     ));
 
-    $settings->add(new admin_setting_configselect(
-        'qbank_stackgen/llm_provider',
-        get_string('settings_llm_provider', 'qbank_stackgen'),
-        get_string('settings_llm_provider_desc', 'qbank_stackgen'),
-        'claude',
-        [
-            'claude' => 'Claude (Anthropic)',
-            'openai' => 'OpenAI (GPT-4o)',
-        ]
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'qbank_stackgen/anthropic_api_key',
-        get_string('settings_anthropic_api_key', 'qbank_stackgen'),
-        get_string('settings_anthropic_api_key_desc', 'qbank_stackgen'),
-        '',
-        PARAM_RAW_TRIMMED
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'qbank_stackgen/openai_api_key',
-        get_string('settings_openai_api_key', 'qbank_stackgen'),
-        get_string('settings_openai_api_key_desc', 'qbank_stackgen'),
-        '',
-        PARAM_RAW_TRIMMED
-    ));
-
     $settings->add(new admin_setting_configtext(
         'qbank_stackgen/maxima_url',
         get_string('settings_maxima_url', 'qbank_stackgen'),

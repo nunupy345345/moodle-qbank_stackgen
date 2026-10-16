@@ -34,19 +34,13 @@ $string['filter_no_results']             = '該当するジョブがありませ
 
 // Settings.
 $string['settings_api_heading']          = 'API設定';
-$string['settings_google_api_key']       = 'Google API キー（Gemini）';
-$string['settings_google_api_key_desc']  = 'Gemini 1.5 Flash OCR に使用するGoogle Cloud APIキー。';
-$string['settings_llm_provider']         = 'LLMプロバイダ';
-$string['settings_llm_provider_desc']    = 'STACK XML生成に使用するLLMを選択してください。';
-$string['settings_anthropic_api_key']    = 'Anthropic API キー（Claude）';
-$string['settings_anthropic_api_key_desc'] = 'Claude を使用する場合に必要です。';
-$string['settings_openai_api_key']       = 'OpenAI API キー';
-$string['settings_openai_api_key_desc']  = 'OpenAI (GPT-4o) を使用する場合に必要です。';
+$string['settings_google_api_key']       = 'Gemini API キー';
+$string['settings_google_api_key_desc']  = 'OCR・誤答例/フィードバック案の生成・STACK XMLの生成・類似問題検索（埋め込み）のすべてに使用する Google Gemini API のキー（必須）。<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> で発行できます。アップロードした画像と生成テキストは Google に送信されます。無料枠では入力が Google のサービス改善に使われる場合があるため、所属機関の方針に合わせてプランを選んでください。';
 $string['settings_maxima_url']           = 'goemaxima URL';
-$string['settings_maxima_url_desc']      = 'goemaxima サービスのURL（Dockerネットワーク内）。';
+$string['settings_maxima_url_desc']      = 'Moodleサーバーから見た goemaxima サービスの URL。Docker では compose のサービス名を使います（例: http://maxima:8080/goemaxima）。';
 $string['settings_max_retry']            = 'CAS検証 最大再試行回数';
 $string['settings_max_retry_desc']       = 'CAS検証失敗時にLLM再生成を試みる最大回数。';
-$string['settings_rag_heading']          = 'RAG設定（Step 6）';
+$string['settings_rag_heading']          = 'RAG設定';
 $string['settings_rag_enabled']          = 'RAG検索を有効にする';
 $string['settings_rag_enabled_desc']     = '教員手作りの良問コーパス（qbank_stackgen_examples）を検索し、Stage3/4のプロンプトに類似例を組み込む。無効にすると従来通り検索なしで生成する。';
 $string['settings_rag_topk']             = 'RAG検索件数（top-k）';

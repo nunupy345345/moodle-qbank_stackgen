@@ -36,12 +36,31 @@
 | 項目 | 内容 |
 |---|---|
 | Moodle | 4.5（`MOODLE_405_STABLE` で動作確認。他のバージョンは未検証） |
-| qtype_stack | [maths/moodle-qtype_stack](https://github.com/maths/moodle-qtype_stack) を先にインストール |
+| qtype_stack | [maths/moodle-qtype_stack](https://github.com/maths/moodle-qtype_stack) を先にインストール（下記「STACK の依存関係」参照） |
 | goemaxima | Moodle サーバーから HTTP で届く場所で起動していること |
-| Gemini API キー | [Google AI Studio](https://aistudio.google.com/) などで取得 |
+| Gemini API キー | [Google AI Studio](https://aistudio.google.com/apikey) で発行（下記「Gemini API キーの取得」参照） |
 | Cron | Moodle の cron が定期的に動いていること（生成処理は Adhoc Task で動く） |
 
 > **プライバシーに関する注意:** アップロードした画像と生成テキストは、Google の Gemini API に送信されます。所属機関の方針と、教科書など元資料の著作権上の扱いを確認したうえで使ってください。
+
+### STACK の依存関係
+
+`qtype_stack` 自体が、次のプラグインを必要とします。いずれも STACK の公開リポジトリ・配布ページから入手できます。**STACK を入れる前に、これらを入れてください。**
+
+- `qbehaviour_dfexplicitvaildate`
+- `qbehaviour_dfcbmexplicitvaildate`
+- `qbehaviour_adaptivemultipart`
+- `qbank_importasversion`
+
+STACK 自身の Maxima（CAS）設定も必要です。STACK のインストール手順と、`/question/type/stack/adminui/healthcheck.php` のヘルスチェックが通ることは、STACK 側のドキュメントで確認してください。このプラグインの `maxima_url`（後述）は、STACK の設定とは別に、検証用に goemaxima を呼び出すためのものです。同じ goemaxima を指しても構いません。
+
+### Gemini API キーの取得
+
+1. [Google AI Studio](https://aistudio.google.com/apikey) に、Google アカウントでログインします。
+2. 「Create API key」でキーを発行し、コピーします。
+3. このプラグインの設定画面の `google_api_key` に貼り付けます。
+
+このキーは、OCR・誤答例/フィードバック案の生成・STACK XML の生成・類似問題検索（埋め込み）のすべてに使われます（モデルは Gemini 2.5 Flash と gemini-embedding-001）。利用料金と無料枠の条件は、Google の最新の案内を確認してください。**無料枠では、入力が Google のサービス改善に使われる場合があります。** 授業資料や、公開できない内容を扱うときは、有料プランなどの条件を確認してください。
 
 ### goemaxima の起動例（Docker）
 
@@ -93,7 +112,7 @@ php admin/cli/upgrade.php --non-interactive
 
 - GitHub の「Download ZIP」で得られる ZIP は、最上位フォルダ名が `moodle-qbank_stackgen-main` で、**そのままでは使えません**。Releases の `stackgen.zip`（最上位フォルダが `stackgen`）を使うか、方法 A を使ってください。
 - この画面を使うには、Web サーバーのユーザーが `question/bank/` に書き込める必要があります。権限がない環境では、方法 A で配置してください。
-- 先に `qtype_stack` をインストールしておく必要があります。
+- 先に `qtype_stack` と、その依存プラグイン（[STACK の依存関係](#stack-の依存関係)）をインストールしておく必要があります。
 
 ### インストールの確認
 
@@ -106,15 +125,13 @@ php admin/cli/upgrade.php --non-interactive
 
 | 設定 | 内容 | 既定値 |
 |---|---|---|
-| `google_api_key` | Gemini API キー（必須） | 空 |
+| `google_api_key` | Gemini API キー（必須。[取得方法](#gemini-api-キーの取得)） | 空 |
 | `maxima_url` | goemaxima の URL | `http://maxima:8080/goemaxima` |
 | `max_retry` | CAS 検証に失敗したときの再生成回数 | 3 |
 | `rag_enabled` | RAG を使うか | ON |
 | `rag_topk` | RAG で参照する類似問題の件数 | 3 |
 
 `maxima_url` は、**Moodle サーバーから見た** URL です。Docker で動かしているなら、コンテナ名（例: `http://maxima:8080/goemaxima`）、サーバー外にあるなら、そのホスト名と IP を指定します。
-
-`llm_provider`、`anthropic_api_key`、`openai_api_key` は将来の切り替え用の項目で、現在は参照されません。
 
 ### 権限
 
@@ -194,7 +211,7 @@ A Moodle question bank plugin that generates STACK questions (with PRT grading l
 
 **Pipeline:** image → Gemini OCR (LaTeX JSON) → AI-proposed wrong answers/feedback reviewed by the teacher → Gemini generates STACK XML → goemaxima CAS validation (auto-regeneration on failure) → direct import into the question bank. Optional RAG over hand-made questions.
 
-**Requirements:** Moodle 4.5, [qtype_stack](https://github.com/maths/moodle-qtype_stack), a reachable [goemaxima](https://github.com/mathinstitut/goemaxima) server, a Gemini API key, and Moodle cron.
+**Requirements:** Moodle 4.5, [qtype_stack](https://github.com/maths/moodle-qtype_stack) (which itself requires `qbehaviour_dfexplicitvaildate`, `qbehaviour_dfcbmexplicitvaildate`, `qbehaviour_adaptivemultipart` and `qbank_importasversion`), a reachable [goemaxima](https://github.com/mathinstitut/goemaxima) server, a Gemini API key, and Moodle cron.
 
 **Install:**
 
@@ -205,7 +222,7 @@ php admin/cli/upgrade.php --non-interactive
 
 Or upload the release `stackgen.zip` (top-level folder `stackgen`) via *Site administration → Plugins → Install plugins*.
 
-**Configure:** *Site administration → Plugins → Question bank plugins → STACK問題生成（画像から）* — set `google_api_key` and `maxima_url`.
+**Configure:** *Site administration → Plugins → Question bank plugins → STACK問題生成（画像から）* — set `google_api_key` (create one in [Google AI Studio](https://aistudio.google.com/apikey); it is used for OCR, generation and embeddings) and `maxima_url`.
 
 **Privacy:** uploaded images and generated text are sent to the Google Gemini API.
 
