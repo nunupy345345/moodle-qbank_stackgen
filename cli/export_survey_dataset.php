@@ -62,12 +62,141 @@ if ($options['since'] !== '') {
 }
 
 /**
+ * <node> 内の単一タグのテキストを取り出す（存在しなければ空文字）。
+ */
+function qbank_stackgen_xml_tag_text(DOMElement $parent, string $tag): string {
+    $els = $parent->getElementsByTagName($tag);
+    return $els->length > 0 ? trim($els->item(0)->textContent) : '';
+}
+
+/**
+ * <truefeedback>/<falsefeedback> のような <tag><text>...</text></tag> からフィードバック本文(HTML)を取り出す。
+ */
+function qbank_stackgen_xml_feedback_text(DOMElement $node, string $tag): string {
+    $els = $node->getElementsByTagName($tag);
+    if ($els->length === 0) {
+        return '';
+    }
+    $texts = $els->item(0)->getElementsByTagName('text');
+    return $texts->length > 0 ? trim($texts->item(0)->textContent) : '';
+}
+
+/**
+ * 1トラック分の <quiz>...</quiz> XML（qbank_stackgen_jobs.xml_result 等、ジョブ全体の全問題分）から、
+ * $index 番目の <question> の <prt> をノード構造のJSONに変換する。
+ * CASを実際に実行するのではなく、生成済みXMLの静的な構造（answertest・スコア配分・フィードバック・
+ * answer note）をそのまま取り出すだけ。
+ *
+ * @return array|null パース失敗・PRTが存在しない場合はnull
+ */
+function qbank_stackgen_parse_prt(?string $quizxml, int $index): ?array {
+    if (empty($quizxml)) {
+        return null;
+    }
+
+    $dom = new DOMDocument();
+    libxml_use_internal_errors(true);
+    if (!$dom->loadXML($quizxml)) {
+        libxml_clear_errors();
+        return null;
+    }
+    libxml_clear_errors();
+
+    $questions = $dom->getElementsByTagName('question');
+    $question = $questions->item($index);
+    if ($question === null) {
+        return null;
+    }
+
+    $prts = $question->getElementsByTagName('prt');
+    if ($prts->length === 0) {
+        return null;
+    }
+    $prt = $prts->item(0);
+
+    $nodes = [];
+    foreach ($prt->getElementsByTagName('node') as $nodeel) {
+        $nodes[] = [
+            'name'        => qbank_stackgen_xml_tag_text($nodeel, 'name'),
+            'description' => qbank_stackgen_xml_tag_text($nodeel, 'description'),
+            'answertest'  => qbank_stackgen_xml_tag_text($nodeel, 'answertest'),
+            'sans'        => qbank_stackgen_xml_tag_text($nodeel, 'sans'),
+            'tans'        => qbank_stackgen_xml_tag_text($nodeel, 'tans'),
+            'testoptions' => qbank_stackgen_xml_tag_text($nodeel, 'testoptions'),
+            'true' => [
+                'scoremode'  => qbank_stackgen_xml_tag_text($nodeel, 'truescoremode'),
+                'score'      => qbank_stackgen_xml_tag_text($nodeel, 'truescore'),
+                'nextnode'   => qbank_stackgen_xml_tag_text($nodeel, 'truenextnode'),
+                'answernote' => qbank_stackgen_xml_tag_text($nodeel, 'trueanswernote'),
+                'feedback'   => qbank_stackgen_xml_feedback_text($nodeel, 'truefeedback'),
+            ],
+            'false' => [
+                'scoremode'  => qbank_stackgen_xml_tag_text($nodeel, 'falsescoremode'),
+                'score'      => qbank_stackgen_xml_tag_text($nodeel, 'falsescore'),
+                'nextnode'   => qbank_stackgen_xml_tag_text($nodeel, 'falsenextnode'),
+                'answernote' => qbank_stackgen_xml_tag_text($nodeel, 'falseanswernote'),
+                'feedback'   => qbank_stackgen_xml_feedback_text($nodeel, 'falsefeedback'),
+            ],
+        ];
+    }
+
+    return [
+        'firstnodename'     => qbank_stackgen_xml_tag_text($prt, 'firstnodename'),
+        'feedbackvariables' => qbank_stackgen_xml_feedback_text($prt, 'feedbackvariables'),
+        'nodes'             => $nodes,
+    ];
+}
+
+/**
+ * $index 番目の <question> から、PRTが参照する変数の定義（ta, wa1, wa1_pred 等を定義する
+ * questionvariables のMaxima コード）と解答欄の定義を取り出す。prt と同じXMLから取るので、
+ * prt 内の sans/tans が参照する変数名と必ず整合する。
+ *
+ * @return array{questionvariables: string, inputs: array}
+ */
+function qbank_stackgen_parse_question_defs(?string $quizxml, int $index): array {
+    $empty = ['questionvariables' => '', 'inputs' => []];
+    if (empty($quizxml)) {
+        return $empty;
+    }
+
+    $dom = new DOMDocument();
+    libxml_use_internal_errors(true);
+    if (!$dom->loadXML($quizxml)) {
+        libxml_clear_errors();
+        return $empty;
+    }
+    libxml_clear_errors();
+
+    $question = $dom->getElementsByTagName('question')->item($index);
+    if ($question === null) {
+        return $empty;
+    }
+
+    $inputs = [];
+    foreach ($question->getElementsByTagName('input') as $inputel) {
+        $inputs[] = [
+            'name' => qbank_stackgen_xml_tag_text($inputel, 'name'),
+            'type' => qbank_stackgen_xml_tag_text($inputel, 'type'),
+            'tans' => qbank_stackgen_xml_tag_text($inputel, 'tans'),
+        ];
+    }
+
+    return [
+        'questionvariables' => qbank_stackgen_xml_feedback_text($question, 'questionvariables'),
+        'inputs'            => $inputs,
+    ];
+}
+
+/**
  * question_idの配列から、1トラック分の表示用データを作る。
  *
  * @return array|null $index番目の問題が存在しなければnull（トラック間で配列長が
  *                     食い違っている＝一部の問題だけ生成に失敗した、という異常系の防御）
  */
-function qbank_stackgen_survey_track_item(array $questionids, int $index, context $context): ?array {
+function qbank_stackgen_survey_track_item(
+    array $questionids, int $index, context $context, ?string $trackxml
+): ?array {
     if (!array_key_exists($index, $questionids)) {
         return null;
     }
@@ -93,11 +222,16 @@ function qbank_stackgen_survey_track_item(array $questionids, int $index, contex
         // （参考用のリンクとして同梱するのみ）。失敗しても他のデータには影響させない。
     }
 
+    $defs = qbank_stackgen_parse_question_defs($trackxml, $index);
+
     return [
-        'question_id'  => $qid,
-        'name'         => $questiondata->name,
-        'questiontext' => $questiondata->questiontext,
-        'preview_url'  => $previewurl,
+        'question_id'       => $qid,
+        'name'              => $questiondata->name,
+        'questiontext'      => $questiondata->questiontext,
+        'preview_url'       => $previewurl,
+        'questionvariables' => $defs['questionvariables'],
+        'inputs'            => $defs['inputs'],
+        'prt'               => qbank_stackgen_parse_prt($trackxml, $index),
     ];
 }
 
@@ -115,9 +249,9 @@ function qbank_stackgen_export_survey_job(stdClass $job): array {
 
     $items = [];
     for ($i = 0; $i < $count; $i++) {
-        $traditional = qbank_stackgen_survey_track_item($traditionalids, $i, $context);
-        $norag       = qbank_stackgen_survey_track_item($noragids, $i, $context);
-        $kc          = qbank_stackgen_survey_track_item($kcids, $i, $context);
+        $traditional = qbank_stackgen_survey_track_item($traditionalids, $i, $context, $job->xml_result);
+        $norag       = qbank_stackgen_survey_track_item($noragids, $i, $context, $job->norag_xml_result);
+        $kc          = qbank_stackgen_survey_track_item($kcids, $i, $context, $job->kc_xml_result);
 
         if ($traditional === null || $norag === null || $kc === null) {
             echo "  [job {$job->id}] problem #{$i} はいずれかのトラックで問題が読み込めなかったためスキップします。\n";
@@ -130,6 +264,10 @@ function qbank_stackgen_export_survey_job(stdClass $job): array {
             'courseid'             => (int)$job->courseid,
             'source_timecreated'   => (int)$job->timecreated,
             'source_question_text' => (string)($problems[$i]['question_text'] ?? ''),
+            // OCR段階でリライト済みの「単独で意味が通る問題文」。3トラックで共通（トラックごとに
+            // LLMが書き換えた tracks.*.questiontext と違い、トラックを推測する手がかりにならない）。
+            'stack_question_text'  => (string)($problems[$i]['stack_question_text']
+                ?? ($problems[$i]['question_text'] ?? '')),
             'tracks'                => [
                 'traditional' => $traditional,
                 'norag'       => $norag,

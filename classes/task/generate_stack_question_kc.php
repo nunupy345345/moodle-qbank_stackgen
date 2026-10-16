@@ -174,7 +174,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
                 try {
                     [$xml, $cot] = $generator->generate_one(
                         $apikey, $problems[$i], $i + 1, $wronganswers, $name,
-                        $problemerror[$i], $ragresults[$i] ?? [], 'independent');
+                        $problemerror[$i], $ragresults[$i] ?? [], 'all_nodes');
                     $debugxml[$i] = $xml;
                     $cots[$i]     = $cot;
                 } catch (\Throwable $e) {

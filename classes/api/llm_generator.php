@@ -78,10 +78,10 @@ PRT（採点ロジック）付きの <question type="stack">...</question> ブ�
 
 SYS;
 
-    // 誤答判定ノードの分岐方式（通常版・RAGなし版）: 「チェーン型」。
+    // 誤答判定ノードの分岐方式（通常版・RAGなし版）: 「早期終了型」。
     // 誤答例の式（wa1, wa2, ...）とリテラルに一致するか ATAlgEquiv で判定し、
-    // 一致した時点でチェーンを打ち切る（早期終了）。
-    private const SYSTEM_CHAIN = <<<'SYS'
+    // 一致した時点で打ち切る（早期終了）。
+    private const SYSTEM_EARLY_EXIT = <<<'SYS'
 【誤答例が渡された場合の PRT 分岐設計ルール（重要）】
 教員が確定した誤答例が渡された場合、正答判定ノードに続けて、誤答例の数だけ判定ノードを直列に追加すること。
 実際に教員が作り込んだ質の高いPRT問題を分析した結果、誤答には常に0点を与えるのではなく、
@@ -175,13 +175,13 @@ SYS;
 </prt>
 SYS;
 
-    // 誤答判定ノードの分岐方式（KC診断版限定）: 「独立判定型」（Phase B Tier1+Tier2）。
+    // 誤答判定ノードの分岐方式（KC診断版限定）: 「全ノード評価型」（Phase B Tier1+Tier2）。
     // 誤答例は「1つの具体的な値」ではなく「そのKCが欠けている答えに共通する構造的特徴」を表す
-    // Maxima述語関数として扱い、一致してもチェーンを打ち切らず必ず全KC診断ノードを評価する。
+    // Maxima述語関数として扱い、一致しても打ち切らず必ず全KC診断ノードを評価する。
     // これにより、1つの誤答から複数KCの欠落を同時に診断できる（STACKのspecificfeedbackは
     // 通過した全ノードのfeedbackを連結表示するため、複数の該当KCが同時に教員・学生に提示される）。
-    private const SYSTEM_INDEPENDENT = <<<'SYS'
-【誤答例が渡された場合の PRT 分岐設計ルール（KC独立判定モード・重要）】
+    private const SYSTEM_ALL_NODES = <<<'SYS'
+【誤答例が渡された場合の PRT 分岐設計ルール（KC全ノード評価モード・重要）】
 教員が確定した誤答例（各誤答に対応する前提知識(KC)の名称・想定原因・フィードバックを含む）が渡された場合、
 正答判定ノードに続けて、誤答例の数だけ「KC診断ノード」を直列に追加すること。
 このモードでは、誤答例は「1つの具体的な値」としてではなく、「そのKCが欠けている答えに共通する
@@ -240,11 +240,11 @@ SYS;
     falsefeedback は空（静かに素通りする）。
   - **true・falseのどちらであっても、truenextnode・falsenextnode は両方とも次のKC診断ノードを
     指すこと**（最後のKC診断ノードだけ、true・false両方を -1 にして終端し、その場合の
-    falsefeedback は「不正解です。」等の汎用フィードバックにする）。チェーン型のように
+    falsefeedback は「不正解です。」等の汎用フィードバックにする）。早期終了型のように
     一致した時点で打ち切ってはならない。
 - 誤答例が渡されなかった場合は、従来通り正誤2択（AlgEquiv 1ノード）で構成すること。
 
-【誤答例ありの場合の PRT 構造例（KC独立判定モード・積分・誤答例2個: wa1, wa2）】
+【誤答例ありの場合の PRT 構造例（KC全ノード評価モード・積分・誤答例2個: wa1, wa2）】
 ※ node1 の answertest は「Answer Test選択ルール」に従って問題タイプごとに変わる（この例は積分なので Int）。
    node2以降のKC診断ノードは常に ATAlgEquiv（述語関数の戻り値がtrueと一致するか）でよい。
 ※ 下例では紙幅の都合で省略しているが、実際の出力では各 <node> に
@@ -319,7 +319,7 @@ wa2_pred(ex) := hipow(ex, x) < hipow(ta, x);
 </prt>
 SYS;
 
-    private const SYSTEM_INDEPENDENT_SELFCHECK = <<<'SYS'
+    private const SYSTEM_ALL_NODES_SELFCHECK = <<<'SYS'
 
 【KC診断述語（waN_pred）の自己チェック（出力前に必ず実施すること）】
 questionvariables に waN_pred(ex) := ... を書き終えたら、<question> ブロックを出力する前に、
@@ -425,15 +425,15 @@ SYS;
      * @param string $lasterror  直前の試行がCAS検証(Stage 5)で失敗した場合のエラー内容。
      *                           再生成時にLLMへ伝え、同じ間違いを繰り返しにくくする。空でもよい。
      * @param array $ragexamples  Step 6 RAG: $problems と同じ順序で、rag_search::search() の結果配列を並べたもの。
-     * @param string $mode  PRT誤答判定ノードの分岐方式。'chain'（デフォルト、通常版・RAGなし版）=
-     *                       誤答例とリテラルに一致したら打ち切る早期終了チェーン。'independent'（KC診断版）=
-     *                       誤答例を構造的特徴の述語関数として扱い、全KC診断ノードを必ず評価する独立判定。
+     * @param string $mode  PRT誤答判定ノードの分岐方式。'early_exit'（デフォルト、通常版・RAGなし版）=
+     *                       誤答例とリテラルに一致したら打ち切る早期終了型。'all_nodes'（KC診断版）=
+     *                       誤答例を構造的特徴の述語関数として扱い、全KC診断ノードを必ず評価する全ノード評価型。
      * @return array  ['xml' => "<?xml...><quiz>...</quiz>", 'cot' => "問題ごとの思考過程を連結したテキスト"]
      * @throws \moodle_exception APIキー未設定・通信エラー・XML不正のとき
      */
     public function run(
         array $problems, array $feedbackproblems = [], string $lasterror = '', array $ragexamples = [],
-        string $mode = 'chain'
+        string $mode = 'early_exit'
     ): array {
         $api_key = get_config('qbank_stackgen', 'google_api_key');
         if (empty($api_key)) {
@@ -468,7 +468,7 @@ SYS;
      * @param string $name  教員がレビュー画面で確定した問題名。空ならLLM任せの名前をそのまま使う。
      * @param string $lasterror  直前の試行のCAS検証エラー内容。空でなければ再生成時にLLMへ伝える。
      * @param array $examples  Step 6 RAG: この問題に類似した過去の良問（rag_search::search()の結果）
-     * @param string $mode  'chain'（既定）または'independent'（KC診断版）。run()のモード引数を参照。
+     * @param string $mode  'early_exit'（既定）または'all_nodes'（KC診断版）。run()のモード引数を参照。
      * @return array [xml, cot]
      *
      * public: run() が全問一括生成に使うほか、呼び出し元タスク（KC診断版）が
@@ -476,7 +476,7 @@ SYS;
      */
     public function generate_one(
         string $api_key, array $problem, int $num, array $wronganswers, string $name = '', string $lasterror = '',
-        array $examples = [], string $mode = 'chain'
+        array $examples = [], string $mode = 'early_exit'
     ): array {
         $qtype     = $problem['question_type'] ?? 'other';
         $variables = $problem['variables']     ?? ['x'];
@@ -629,11 +629,11 @@ SYS;
      * $mode に応じたPRT分岐設計ルール（誤答判定ノードの部分のみ差し替え）を組み込んだ
      * システムプロンプト全体を組み立てる。
      *
-     * @param string $mode 'chain'（既定）または'independent'
+     * @param string $mode 'early_exit'（既定）または'all_nodes'
      */
     private static function build_system(string $mode): string {
-        $rules = $mode === 'independent' ? self::SYSTEM_INDEPENDENT : self::SYSTEM_CHAIN;
-        $selfcheck = $mode === 'independent' ? self::SYSTEM_INDEPENDENT_SELFCHECK : '';
+        $rules = $mode === 'all_nodes' ? self::SYSTEM_ALL_NODES : self::SYSTEM_EARLY_EXIT;
+        $selfcheck = $mode === 'all_nodes' ? self::SYSTEM_ALL_NODES_SELFCHECK : '';
         return self::SYSTEM_BASE . $rules . $selfcheck . "\n" . self::SYSTEM_TEMPLATE;
     }
 
