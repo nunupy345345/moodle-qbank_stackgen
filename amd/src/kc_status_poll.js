@@ -9,10 +9,21 @@ define(['core/ajax', 'core/templates', 'core/notification'], function(Ajax, Temp
     var courseid;
     var delay = BASE_DELAY;
 
+    /**
+     * Schedule the next status poll.
+     *
+     * @param {number} ms Delay in milliseconds.
+     */
     function schedule(ms) {
         setTimeout(poll, ms);
     }
 
+    /**
+     * Re-render a job card with the latest job data.
+     *
+     * @param {Object} job Job data returned by the web service.
+     * @param {HTMLElement} card Existing card element to replace.
+     */
     function renderJobCard(job, card) {
         Templates.renderForPromise('qbank_stackgen/kc_job_card', job).then(function(result) {
             Templates.replaceNode(card, result.html, result.js);
@@ -25,6 +36,11 @@ define(['core/ajax', 'core/templates', 'core/notification'], function(Ajax, Temp
         });
     }
 
+    /**
+     * Update the cards of changed jobs and decide whether to keep polling.
+     *
+     * @param {Object[]} jobs Job data returned by the web service.
+     */
     function handleResponse(jobs) {
         var stillPolling = false;
 
@@ -49,11 +65,17 @@ define(['core/ajax', 'core/templates', 'core/notification'], function(Ajax, Temp
         }
     }
 
+    /**
+     * Back off the polling interval after a failed request.
+     */
     function handleFailure() {
         delay = delay * BACKOFF_MULTIPLIER;
         schedule(delay);
     }
 
+    /**
+     * Fetch the latest job statuses of the course.
+     */
     function poll() {
         Ajax.call([{
             methodname: 'qbank_stackgen_get_kc_job_statuses',

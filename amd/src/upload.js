@@ -81,13 +81,22 @@ define(['core/notification'], function(Notification) {
             var trackKc          = document.getElementById('stackgen-track-kc');
             var trackNorag       = document.getElementById('stackgen-track-norag');
 
+            /**
+             * Whether at least one generation track is checked.
+             *
+             * @return {boolean} True if a track is selected.
+             */
             function trackSelected() {
                 return (trackTraditional && trackTraditional.checked) || (trackKc && trackKc.checked)
                     || (trackNorag && trackNorag.checked);
             }
 
-            // folderSubmit/selectedFiles are declared later in this same function (var hoisting);
-            // this only runs from a 'change' event fired after init() has finished setting them up.
+            /**
+             * Enable or disable the submit button when a track checkbox changes.
+             *
+             * folderSubmit/selectedFiles are declared later in this same function (var hoisting);
+             * this only runs from a 'change' event fired after init() has finished setting them up.
+             */
             function onTrackChange() {
                 if (submitBtn && b64Input.value !== '') {
                     submitBtn.disabled = !trackSelected();

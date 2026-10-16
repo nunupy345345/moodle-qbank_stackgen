@@ -32,6 +32,11 @@ define(['core/notification'], function(Notification) {
         return {name: name, questiontext: questiontext, wronganswers: wronganswers};
     }
 
+    /**
+     * Render the math in a review panel with MathJax.
+     *
+     * @param {HTMLElement} panel Review panel element.
+     */
     function typeset(panel) {
         if (window.MathJax && window.MathJax.typesetPromise) {
             window.MathJax.typesetPromise([panel]).catch(function(err) {
@@ -40,6 +45,11 @@ define(['core/notification'], function(Notification) {
         }
     }
 
+    /**
+     * Collect the edited wrong answers and feedback of a job and send them to the server.
+     *
+     * @param {HTMLElement} confirmBtn The clicked confirm button.
+     */
     function handleConfirm(confirmBtn) {
         var jobid = confirmBtn.getAttribute('data-jobid');
         var panel = document.querySelector('.stackgen-review-panel[data-jobid="' + jobid + '"]');
@@ -140,6 +150,11 @@ define(['core/notification'], function(Notification) {
         return {name: name, questiontext: questiontext, wronganswers: wronganswers};
     }
 
+    /**
+     * Same as handleConfirm, for the no-RAG comparison track.
+     *
+     * @param {HTMLElement} confirmBtn The clicked confirm button.
+     */
     function handleNoragConfirm(confirmBtn) {
         var jobid = confirmBtn.getAttribute('data-jobid');
         var panel = document.querySelector('.stackgen-norag-review-panel[data-jobid="' + jobid + '"]');
@@ -197,6 +212,9 @@ define(['core/notification'], function(Notification) {
         });
     }
 
+    /**
+     * Register the click handlers of the review panels.
+     */
     function init() {
         document.addEventListener('click', function(e) {
             var toggle = e.target.closest('.stackgen-review-toggle');

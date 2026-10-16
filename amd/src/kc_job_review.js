@@ -27,6 +27,11 @@ define(['core/notification'], function(Notification) {
         return {wronganswers: wronganswers};
     }
 
+    /**
+     * Collect the edited wrong answers and feedback of a KC job and send them to the server.
+     *
+     * @param {HTMLElement} confirmBtn The clicked confirm button.
+     */
     function handleConfirm(confirmBtn) {
         var jobid = confirmBtn.getAttribute('data-jobid');
         var panel = document.querySelector('.stackgen-kc-review-panel[data-jobid="' + jobid + '"]');
@@ -86,6 +91,9 @@ define(['core/notification'], function(Notification) {
         });
     }
 
+    /**
+     * Register the click handlers of the KC review panels.
+     */
     function init() {
         document.addEventListener('click', function(e) {
             var addBtn = e.target.closest('.stackgen-kc-wa-add');
