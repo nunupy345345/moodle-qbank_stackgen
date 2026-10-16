@@ -1,0 +1,10 @@
+# 実コース内容を含むデータセット出力（pushしない）
+cli/dataset_export/
+cli/survey_dataset_export/
+
+# docker-compose.yaml の bind mount 先（開発環境のみ）
+fixtures_prt/
+fixtures_kc/
+text_img/
+
+node_modules/
