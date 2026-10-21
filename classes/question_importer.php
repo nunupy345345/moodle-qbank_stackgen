@@ -24,6 +24,8 @@ class question_importer {
     // 前提知識起点の別系統の誤答例を使うため、教員が区別しやすいよう別カテゴリに分ける。
     const CATEGORY_MARKER = 'qbank_stackgen_auto_category';
     const CATEGORY_MARKER_KC = 'qbank_stackgen_auto_category_kc';
+    // アンケート用: 比較対象の人間版(教員手作りPRT)を取り込むカテゴリ(cli/survey_import_human.php)。
+    const CATEGORY_MARKER_HUMAN = 'qbank_stackgen_survey_human_category';
 
     /**
      * @param \stdClass $job qbank_stackgen_jobs の1レコード（xml_result/courseidが必須）
@@ -138,7 +140,7 @@ class question_importer {
      * コースの「Default for <コース名>」カテゴリの下に、STACKGen専用のサブカテゴリを
      * 取得または作成する（$categorymarker ごとに1つ）。
      */
-    private static function get_target_category(\context $context, string $categorymarker): \stdClass {
+    public static function get_target_category(\context $context, string $categorymarker): \stdClass {
         global $DB;
 
         $default = question_make_default_categories([$context]);
@@ -152,7 +154,11 @@ class question_importer {
             return $existing;
         }
 
-        $namestring = $categorymarker === self::CATEGORY_MARKER_KC ? 'kc_import_category_name' : 'import_category_name';
+        $namestrings = [
+            self::CATEGORY_MARKER_KC    => 'kc_import_category_name',
+            self::CATEGORY_MARKER_HUMAN => 'human_import_category_name',
+        ];
+        $namestring = $namestrings[$categorymarker] ?? 'import_category_name';
 
         $category = new \stdClass();
         $category->name       = get_string($namestring, 'qbank_stackgen');

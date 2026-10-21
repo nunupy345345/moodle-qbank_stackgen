@@ -4,7 +4,8 @@
  * アンケート用データセットを1本のJSONとしてエクスポートするCLIスクリプト。
  *
  * アンケート用ジョブ(cli/survey_seed.php で登録したもの)には、同じ問題の人間版(同梱コーパスの
- * 教員手作りPRT)も tracks.human として同じ形式で添える。
+ * 教員手作りPRT。cli/survey_import_human.php で問題バンクに取り込み済みのもの)も
+ * tracks.human として同じ形式で添える。
  *
  * このプラグイン自体はアンケートWebページを持たない（別プロジェクトで構築する）。
  * ここでの役割は、同一の元問題（qbank_stackgen_jobs 1レコード = 1画像、ocr_result.problems
@@ -239,87 +240,51 @@ function qbank_stackgen_survey_track_item(
 }
 
 /**
- * 人間版の問題文に含まれる {@var@} を展開する。
+ * アンケート用の人間版(cli/survey_import_human.php で問題バンクに取り込んだ教員手作りPRT)を、
+ * 生成3版と同じ形式の1トラック分データにする。元ファイルとの対応は
+ * question_bank_entries.idnumber(=ファイル名)で引く。
  *
- * STACK は表示時に {@expr@} をCAS評価結果(LaTeX)へ置き換える。生成3版は展開済みの問題文で
- * 保存されているため、アンケートで同じ見え方になるよう、同梱の items.json に起こしたLaTeXで
- * 式の変数(expr / ex)を展開する。それ以外の変数(定積分の下限・上限 a, b など)は
- * questionvariables の数値リテラルをそのまま使う。数式区切り(\[ \] / \( \))の外にある場合は
- * STACK と同様に \( \) で囲む。展開できない {@...@} はそのまま残す。
+ * @return array|null 取り込まれていない・読めない場合は null
  */
-function qbank_stackgen_render_human_text(string $html, string $questionvariables, string $exprlatex): string {
-    $values = [];
-    if (preg_match_all('/(?:^|[;\s])([a-zA-Z]\w*)\s*:\s*(-?\d+(?:\.\d+)?)\s*;/', $questionvariables, $m, PREG_SET_ORDER)) {
-        foreach ($m as $row) {
-            $values[$row[1]] = $row[2];
-        }
-    }
-    $values['expr'] = $exprlatex;
-    $values['ex']   = $exprlatex;
+function qbank_stackgen_survey_human_item(int $courseid, string $sourcefile): ?array {
+    global $DB;
 
-    $out = '';
-    $pos = 0;
-    while (preg_match('/\{@(\w+)@\}/', $html, $mm, PREG_OFFSET_CAPTURE, $pos)) {
-        [$token, $offset] = $mm[0];
-        $var = $mm[1][0];
-        $before = substr($html, 0, $offset);
-        // 直前に閉じていない \[ または \( があれば数式の内側。
-        $inmath = (substr_count($before, '\\[') > substr_count($before, '\\]'))
-            || (substr_count($before, '\\(') > substr_count($before, '\\)'));
-        if (isset($values[$var]) && $values[$var] !== '') {
-            if (!in_array($var, ['expr', 'ex'], true)) {
-                $rep = $values[$var];
-            } else if ($inmath) {
-                // \int{@expr@} のように直前のコマンドとつながっても壊れないよう { } で囲む。
-                $rep = '{' . $values[$var] . '}';
-            } else {
-                $rep = '\\(' . $values[$var] . '\\)';
-            }
-        } else {
-            $rep = $token;
-        }
-        $out .= substr($html, $pos, $offset - $pos) . $rep;
-        $pos = $offset + strlen($token);
+    $context = context_course::instance($courseid);
+    $qid = $DB->get_field_sql(
+        'SELECT qv.questionid
+           FROM {question_bank_entries} qbe
+           JOIN {question_versions} qv ON qv.questionbankentryid = qbe.id
+           JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
+          WHERE qc.contextid = :ctx AND qc.idnumber = :marker AND qbe.idnumber = :idn
+       ORDER BY qv.version DESC',
+        ['ctx' => $context->id, 'marker' => \qbank_stackgen\question_importer::CATEGORY_MARKER_HUMAN,
+         'idn' => basename($sourcefile)],
+        IGNORE_MULTIPLE
+    );
+    if (!$qid) {
+        return null;
     }
-    return $out . substr($html, $pos);
-}
 
-/**
- * 人間版(同梱コーパスの教員手作りXML)を、生成3版と同じ形式の1トラック分データにする。
- * 問題バンクには登録していないため question_id / preview_url は null。
- *
- * @return array|null 対応するXMLが無い・読めない場合は null
- */
-function qbank_stackgen_survey_human_item(string $sourcefile, string $exprlatex): ?array {
     $path = \qbank_stackgen\local\corpus_importer::BUNDLED_DIR . '/' . basename($sourcefile);
-    if (!is_readable($path)) {
-        return null;
-    }
-    $quizxml = file_get_contents($path);
+    $quizxml = is_readable($path) ? file_get_contents($path) : null;
 
-    $dom = new DOMDocument();
-    libxml_use_internal_errors(true);
-    $ok = $dom->loadXML($quizxml);
-    libxml_clear_errors();
-    $question = $ok ? $dom->getElementsByTagName('question')->item(0) : null;
-    if ($question === null) {
+    $item = qbank_stackgen_survey_track_item([(int)$qid], 0, $context, $quizxml);
+    if ($item === null) {
         return null;
     }
 
-    $defs = qbank_stackgen_parse_question_defs($quizxml, 0);
-    $raw  = qbank_stackgen_xml_feedback_text($question, 'questiontext');
-
-    return [
-        'question_id'       => null,
-        'name'              => qbank_stackgen_xml_feedback_text($question, 'name'),
-        'questiontext'      => qbank_stackgen_render_human_text($raw, $defs['questionvariables'], $exprlatex),
-        'questiontext_raw'  => $raw,
-        'preview_url'       => null,
-        'questionvariables' => $defs['questionvariables'],
-        'inputs'            => $defs['inputs'],
-        'prt'               => qbank_stackgen_parse_prt($quizxml, 0),
-        'source_file'       => basename($sourcefile),
-    ];
+    // 人間版の問題文は {@expr@} を含む。生成3版は展開済みなので、STACKに実際に展開させた
+    // 問題文(CAS評価後のLaTeX)を questiontext とし、元の文字列は questiontext_raw に残す。
+    $item['questiontext_raw'] = $item['questiontext'];
+    try {
+        $question = question_bank::load_question((int)$qid);
+        $question->start_attempt(new question_attempt_step(), 1);
+        $item['questiontext'] = $question->questiontextinstantiated->get_rendered();
+    } catch (\Throwable $e) {
+        echo "  [warn] 人間版 {$sourcefile} の問題文を展開できませんでした（rawのまま）: " . $e->getMessage() . "\n";
+    }
+    $item['source_file'] = basename($sourcefile);
+    return $item;
 }
 
 function qbank_stackgen_export_survey_job(stdClass $job): array {
@@ -345,11 +310,13 @@ function qbank_stackgen_export_survey_job(stdClass $job): array {
             continue;
         }
 
-        // アンケート用ジョブ(survey_seed.php で登録)なら、同じ問題の人間版も tracks.human に添える。
+        // アンケート用ジョブ(survey_seed.php で登録したもの)なら、同じ問題の人間版も tracks.human に添える。
         $human = null;
         if (!empty($job->sourcefilename) && isset($GLOBALS['qbank_stackgen_survey_items'][$job->sourcefilename])) {
-            $human = qbank_stackgen_survey_human_item($job->sourcefilename,
-                $GLOBALS['qbank_stackgen_survey_items'][$job->sourcefilename]);
+            $human = qbank_stackgen_survey_human_item((int)$job->courseid, $job->sourcefilename);
+            if ($human === null) {
+                echo "  [job {$job->id}] 人間版が問題バンクにありません（先に survey_import_human.php を実行）。\n";
+            }
         }
 
         $items[] = [
@@ -373,12 +340,12 @@ function qbank_stackgen_export_survey_job(stdClass $job): array {
     return $items;
 }
 
-// アンケート用の人間版を添えるための対応表（sourcefile => 式のLaTeX）。items.json が無ければ空。
+// アンケート用の人間版を添える対象（sourcefile の集合）。items.json が無ければ空。
 $GLOBALS['qbank_stackgen_survey_items'] = [];
 $surveyitemsfile = __DIR__ . '/../data/survey/items.json';
 if (is_readable($surveyitemsfile)) {
     foreach ((json_decode((string)file_get_contents($surveyitemsfile), true)['items'] ?? []) as $it) {
-        $GLOBALS['qbank_stackgen_survey_items'][$it['sourcefile']] = $it['problem_expression'];
+        $GLOBALS['qbank_stackgen_survey_items'][$it['sourcefile']] = true;
     }
 }
 
