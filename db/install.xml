@@ -20,6 +20,7 @@
         <FIELD NAME="question_category_id"   TYPE="int"  LENGTH="10" NOTNULL="false" COMMENT="Stage6の登録先question_categories.id"/>
         <FIELD NAME="retry_count"  TYPE="int"  LENGTH="2"  NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="rag_examples_used" TYPE="text" NOTNULL="false" COMMENT="RAG検索でヒットしたqbank_stackgen_examples.idと類似度のJSON配列(トレーサビリティ・効果測定用)"/>
+        <FIELD NAME="rag_exclude" TYPE="text" NOTNULL="false" COMMENT="RAG検索から除外するqbank_stackgen_examples.sourcefileのJSON配列(アンケート用のleave-one-out生成で使用。通常はNULL)"/>
         <FIELD NAME="sourcefilename" TYPE="char" LENGTH="255" NOTNULL="false" COMMENT="cli/bulk_import.phpでフォルダから一括投入した場合の元ファイル名(重複投入防止用。ブラウザアップロード分はNULL)"/>
         <FIELD NAME="kc_status"                TYPE="char" LENGTH="30" NOTNULL="true" DEFAULT="" COMMENT="KC診断版(別ページ)の進捗。空=未着手"/>
         <FIELD NAME="kc_feedback_result"        TYPE="text" NOTNULL="false" COMMENT="KC診断版Stage3: AI生成の誤答例(KC起点)のJSON"/>

@@ -19,12 +19,13 @@ class rag_search {
      *
      * @param string $querytext 検索クエリ(OCR結果の問題文)
      * @param int    $topk      取得件数
+     * @param string[] $exclude 検索対象から除外する sourcefile（アンケート用のleave-one-out生成で使用。通常は空）
      * @return array [['id'=>int, 'sourcefile'=>string, 'category'=>string, 'qtext'=>string,
      *                 'score'=>int, 'n_nodes'=>int, 'distinct_tests'=>string[], 'distinct_scores'=>string[],
      *                 'similarity'=>float], ...]  類似度降順
      * @throws \moodle_exception 埋め込みAPI呼び出しに失敗したとき
      */
-    public static function search(string $querytext, int $topk = 3): array {
+    public static function search(string $querytext, int $topk = 3, array $exclude = []): array {
         global $DB;
 
         // 初回(コーパスが空)のみ、プラグイン同梱の良問を自動で取り込む。
@@ -42,6 +43,9 @@ class rag_search {
 
         $scored = [];
         foreach ($examples as $example) {
+            if (in_array($example->sourcefile, $exclude, true)) {
+                continue;
+            }
             $vector = json_decode($example->embedding, true);
             if (!is_array($vector) || empty($vector)) {
                 continue;

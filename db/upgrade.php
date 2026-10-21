@@ -212,5 +212,16 @@ function xmldb_qbank_stackgen_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026100600, 'qbank', 'stackgen');
     }
 
+    if ($oldversion < 2026102200) {
+        $table = new xmldb_table('qbank_stackgen_jobs');
+
+        $field = new xmldb_field('rag_exclude', XMLDB_TYPE_TEXT, null, null, null, null, null, 'rag_examples_used');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_plugin_savepoint(true, 2026102200, 'qbank', 'stackgen');
+    }
+
     return true;
 }

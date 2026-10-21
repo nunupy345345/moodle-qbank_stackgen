@@ -228,16 +228,21 @@ class generate_stack_question extends \core\task\adhoc_task {
      * @return array $problems と同じ順序の配列。各要素は rag_search::search() の結果（空配列もありうる）。
      */
     private function run_rag_search(int $jobid, array $problems): array {
+        global $DB;
+
         if (empty(get_config('qbank_stackgen', 'rag_enabled'))) {
             return array_fill(0, count($problems), []);
         }
 
         $topk = max(1, (int)(get_config('qbank_stackgen', 'rag_topk') ?: 3));
+        // アンケート用のleave-one-out生成: ジョブごとに指定された sourcefile を検索対象から外す。
+        $exclude = json_decode((string)$DB->get_field('qbank_stackgen_jobs', 'rag_exclude', ['id' => $jobid]), true);
+        $exclude = is_array($exclude) ? $exclude : [];
         $results = [];
         foreach ($problems as $i => $problem) {
             try {
                 $querytext = $problem['stack_question_text'] ?? ($problem['question_text'] ?? '');
-                $results[$i] = $querytext !== '' ? \qbank_stackgen\local\rag_search::search($querytext, $topk) : [];
+                $results[$i] = $querytext !== '' ? \qbank_stackgen\local\rag_search::search($querytext, $topk, $exclude) : [];
             } catch (\Throwable $e) {
                 mtrace("[qbank_stackgen] Job {$jobid}: RAG search failed for problem #" . ($i + 1)
                     . ", continuing without it: " . $e->getMessage());
