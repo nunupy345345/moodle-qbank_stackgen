@@ -1,0 +1,674 @@
+[
+  {
+    "file": "05_integral_(x^3+x+1)-(x^4+x^2)の積分.xml",
+    "n_nodes": 5,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 4,
+    "n_feedback_texts": 2,
+    "distinct_scores": [
+      "0.0000000",
+      "0.9000000",
+      "1.0000000"
+    ],
+    "score": 9,
+    "reasons": [
+      "長いPRTチェーン(node5)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで4個モデル化",
+      "具体的フィードバック文2件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "(x^3+x+1)/(x^4+x^2)の積分",
+    "qtext": "次の積分を計算せよ。任意定数を忘れないこと。 \\[\\int{@expr@}\\mathrm{d}x\\] [[input:ans1]] [[va",
+    "category": "integral"
+  },
+  {
+    "file": "18_integral_x-exp(-3-x)の積分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 2,
+    "distinct_scores": [
+      "0.1000000",
+      "0.3000000",
+      "0.9000000",
+      "1.0000000"
+    ],
+    "score": 9,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(4段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "具体的フィードバック文2件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "x*exp(-3*x)の積分",
+    "qtext": "次の関数をの不定積分を求めよ。任意定数を忘れないこと。 \\(\\displaystyle \\int {@expr@} \\mathrm{d}x ",
+    "category": "integral"
+  },
+  {
+    "file": "19_integral_x-sin(x)の積分.xml",
+    "n_nodes": 5,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 3,
+    "n_feedback_texts": 3,
+    "distinct_scores": [
+      "0.0000000",
+      "0.9000000",
+      "1.0000000"
+    ],
+    "score": 9,
+    "reasons": [
+      "長いPRTチェーン(node5)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで3個モデル化",
+      "具体的フィードバック文3件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "x*sin(x)の積分",
+    "qtext": "次の関数をの不定積分を求めよ。任意定数を忘れないこと。 \\(\\displaystyle \\int {@expr@} \\mathrm{d}x ",
+    "category": "integral"
+  },
+  {
+    "file": "22_integral_積分 (2x+1)(x-3)^7.xml",
+    "n_nodes": 6,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 4,
+    "n_feedback_texts": 4,
+    "distinct_scores": [
+      "0.1000000",
+      "0.3000000",
+      "0.5000000",
+      "0.8000000",
+      "0.9000000",
+      "1.0000000"
+    ],
+    "score": 9,
+    "reasons": [
+      "長いPRTチェーン(node6)",
+      "段階的部分点(6段階)",
+      "想定誤答パターンをfeedbackvariablesで4個モデル化",
+      "具体的フィードバック文4件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "積分 (2x+1)(x-3)^7",
+    "qtext": "次の関数の不定積分を求めよ。任意定数もつけること。 \\(\\displaystyle \\int {@ex@} \\mathrm{d}x = \\)",
+    "category": "integral"
+  },
+  {
+    "file": "23_integral_積分 x-(x+3)^4.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 2,
+    "distinct_scores": [
+      "0.1000000",
+      "0.2000000",
+      "1.0000000"
+    ],
+    "score": 9,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "具体的フィードバック文2件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "積分 x/(x+3)^4",
+    "qtext": "次の関数の不定積分を求めよ。任意定数もつけること。 \\(\\displaystyle \\int {@ex@} \\mathrm{d}x = \\)",
+    "category": "integral"
+  },
+  {
+    "file": "24_integral_積分 x-sqrt(2x+1).xml",
+    "n_nodes": 7,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 5,
+    "n_feedback_texts": 4,
+    "distinct_scores": [
+      "0.1000000",
+      "0.3000000",
+      "0.5000000",
+      "0.8000000",
+      "0.9000000",
+      "1.0000000"
+    ],
+    "score": 9,
+    "reasons": [
+      "長いPRTチェーン(node7)",
+      "段階的部分点(6段階)",
+      "想定誤答パターンをfeedbackvariablesで5個モデル化",
+      "具体的フィードバック文4件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "積分 x/sqrt(2x+1)",
+    "qtext": "次の関数の不定積分を求めよ。任意定数もつけること。 \\(\\displaystyle \\int {@ex@} \\mathrm{d}x = \\)",
+    "category": "integral"
+  },
+  {
+    "file": "26_integral_積分 x^3sqrt(x^2+1).xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 3,
+    "distinct_scores": [
+      "0.1000000",
+      "0.2000000",
+      "1.0000000"
+    ],
+    "score": 9,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "具体的フィードバック文3件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "積分 x^3sqrt(x^2+1)",
+    "qtext": "次の関数の不定積分を求めよ。任意定数もつけること。 \\(\\displaystyle \\int {@ex@} \\mathrm{d}x = \\)",
+    "category": "integral"
+  },
+  {
+    "file": "03_integral_(3x+2)^4の積分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 0,
+    "distinct_scores": [
+      "0.1000000",
+      "0.2000000",
+      "1.0000000"
+    ],
+    "score": 8,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "(3x+2)^4の積分",
+    "qtext": "次の積分を計算せよ。 \\[ \\int {@expr@} \\mathrm{d}x \\] [[input:ans1]] [[validation",
+    "category": "integral"
+  },
+  {
+    "file": "08_integral_1-sin(x)の積分.xml",
+    "n_nodes": 6,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 5,
+    "n_feedback_texts": 0,
+    "distinct_scores": [
+      "0.0000000",
+      "0.1000000",
+      "1.0000000"
+    ],
+    "score": 8,
+    "reasons": [
+      "長いPRTチェーン(node6)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで5個モデル化",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "1/sin(x)の積分",
+    "qtext": "次の積分を計算せよ。（ヒント：\\(\\cos x = t\\)と置換するように工夫してみよ。）なお，\\(|x|\\)はabs(x)と入力せよ。例：",
+    "category": "integral"
+  },
+  {
+    "file": "15_integral_sin(x)^2の積分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 0,
+    "distinct_scores": [
+      "0.0000000",
+      "0.9000000",
+      "1.0000000"
+    ],
+    "score": 8,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "sin(x)^2の積分",
+    "qtext": "次の積分を計算せよ。 \\[\\int{@expr@}\\mathrm{d}x\\] [[input:ans1]] [[validation:ans",
+    "category": "integral"
+  },
+  {
+    "file": "16_derivative_sin(x^2+1)の微分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 3,
+    "n_feedback_texts": 3,
+    "distinct_scores": [
+      "0.2000000",
+      "0.3000000",
+      "1.0000000"
+    ],
+    "score": 8,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで3個モデル化",
+      "具体的フィードバック文3件"
+    ],
+    "is_bad_named": false,
+    "name": "sin(x^2+1)の微分",
+    "qtext": "次の関数の導関数を求めよ。 \\[{@expr@}\\] [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  },
+  {
+    "file": "17_derivative_sin^4(x)の微分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 3,
+    "n_feedback_texts": 3,
+    "distinct_scores": [
+      "0.2000000",
+      "0.3000000",
+      "1.0000000"
+    ],
+    "score": 8,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで3個モデル化",
+      "具体的フィードバック文3件"
+    ],
+    "is_bad_named": false,
+    "name": "sin^4(x)の微分",
+    "qtext": "次の関数を\\(x\\)で微分せよ。（\\(\\sin^4(x)\\)は sin(x)^4のように入力してください） {@expr@} [[input",
+    "category": "derivative"
+  },
+  {
+    "file": "20_derivative_xe^{-x^2}の微分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 3,
+    "n_feedback_texts": 3,
+    "distinct_scores": [
+      "0.2000000",
+      "0.3000000",
+      "1.0000000"
+    ],
+    "score": 8,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで3個モデル化",
+      "具体的フィードバック文3件"
+    ],
+    "is_bad_named": false,
+    "name": "xe^{-x^2}の微分",
+    "qtext": "次の関数を\\(x\\)で微分せよ。 {@expr@} [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  },
+  {
+    "file": "21_integral_x^2-e^-xの積分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 0,
+    "distinct_scores": [
+      "0.0000000",
+      "0.9000000",
+      "1.0000000"
+    ],
+    "score": 8,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "x^2*e^-xの積分",
+    "qtext": "次の積分を計算せよ。 \\[\\int{@expr@}\\mathrm{d}x\\] [[input:ans1]] [[validation:ans",
+    "category": "integral"
+  },
+  {
+    "file": "02_integral_(2x+7)-(x^2+x-2)の積分.xml",
+    "n_nodes": 3,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 3,
+    "n_feedback_texts": 1,
+    "distinct_scores": [
+      "0.0000000",
+      "0.9000000",
+      "1.0000000"
+    ],
+    "score": 7,
+    "reasons": [
+      "複数node(3)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで3個モデル化",
+      "具体的フィードバック文1件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "(2x+7)/(x^2+x-2)の積分",
+    "qtext": "次の積分を計算せよ。任意定数を忘れないこと。 \\(\\displaystyle \\int {@expr@} \\mathrm{d}x = \\) ",
+    "category": "integral"
+  },
+  {
+    "file": "06_integral_1-(x^2-4x+29)の積分.xml",
+    "n_nodes": 3,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 2,
+    "distinct_scores": [
+      "0.1000000",
+      "0.2000000",
+      "1.0000000"
+    ],
+    "score": 7,
+    "reasons": [
+      "複数node(3)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "具体的フィードバック文2件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "1/(x^2-4x+29)の積分",
+    "qtext": "次の積分を計算せよ。任意定数を忘れないこと。 \\(\\displaystyle \\int{@expr@} \\mathrm{d}x = \\) [",
+    "category": "integral"
+  },
+  {
+    "file": "13_derivative_ln(abs(tan(x-2)))の微分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 3,
+    "n_feedback_texts": 0,
+    "distinct_scores": [
+      "0.2000000",
+      "0.3000000",
+      "1.0000000"
+    ],
+    "score": 7,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで3個モデル化"
+    ],
+    "is_bad_named": false,
+    "name": "ln(abs(tan(x/2)))の微分",
+    "qtext": "次の関数を導関数を求めよ。 \\[{@expr@}\\] [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  },
+  {
+    "file": "25_integral_積分 x^2(x-1)^5.xml",
+    "n_nodes": 7,
+    "distinct_tests": [
+      "AlgEquiv",
+      "Int"
+    ],
+    "n_fbvars_lines": 4,
+    "n_feedback_texts": 5,
+    "distinct_scores": [
+      "0.1000000",
+      "1.0000000"
+    ],
+    "score": 7,
+    "reasons": [
+      "長いPRTチェーン(node7)",
+      "想定誤答パターンをfeedbackvariablesで4個モデル化",
+      "具体的フィードバック文5件",
+      "専用AnswerTest使用(Int)"
+    ],
+    "is_bad_named": false,
+    "name": "積分 x^2(x-1)^5",
+    "qtext": "次の関数の不定積分を求めよ。任意定数もつけること。 \\(\\displaystyle \\int {@ex@} \\mathrm{d}x = \\)",
+    "category": "integral"
+  },
+  {
+    "file": "01_derivative_(2-x^2)^3の微分.xml",
+    "n_nodes": 3,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 2,
+    "distinct_scores": [
+      "0.2000000",
+      "0.3000000",
+      "1.0000000"
+    ],
+    "score": 6,
+    "reasons": [
+      "複数node(3)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "具体的フィードバック文2件"
+    ],
+    "is_bad_named": false,
+    "name": "(2-x^2)^3の微分",
+    "qtext": "次の関数の導関数を求めよ。 \\[{@expr@}\\] [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  },
+  {
+    "file": "04_derivative_(x+1)log(x+1)の微分.xml",
+    "n_nodes": 3,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 2,
+    "distinct_scores": [
+      "0.2000000",
+      "0.3000000",
+      "1.0000000"
+    ],
+    "score": 6,
+    "reasons": [
+      "複数node(3)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "具体的フィードバック文2件"
+    ],
+    "is_bad_named": false,
+    "name": "(x+1)log(x+1)の微分",
+    "qtext": "次の関数を\\(x\\)で微分せよ。 {@expr@} [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  },
+  {
+    "file": "07_derivative_1-ln(x)の微分.xml",
+    "n_nodes": 3,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 2,
+    "distinct_scores": [
+      "0.0000000",
+      "0.2000000",
+      "1.0000000"
+    ],
+    "score": 6,
+    "reasons": [
+      "複数node(3)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "具体的フィードバック文2件"
+    ],
+    "is_bad_named": false,
+    "name": "1/ln(x)の微分",
+    "qtext": "次の関数の導関数を求めよ。 \\[{@expr@}\\] [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  },
+  {
+    "file": "09_derivative_2x-1-3x+4の微分.xml",
+    "n_nodes": 3,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 2,
+    "n_feedback_texts": 2,
+    "distinct_scores": [
+      "0.0000000",
+      "0.2000000",
+      "1.0000000"
+    ],
+    "score": 6,
+    "reasons": [
+      "複数node(3)",
+      "段階的部分点(3段階)",
+      "想定誤答パターンをfeedbackvariablesで2個モデル化",
+      "具体的フィードバック文2件"
+    ],
+    "is_bad_named": false,
+    "name": "2x-1/3x+4の微分",
+    "qtext": "次の関数の導関数を求めよ。 \\[{@expr@}\\] [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  },
+  {
+    "file": "10_integral_cos(2-x-3)の定積分.xml",
+    "n_nodes": 6,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 5,
+    "n_feedback_texts": 5,
+    "distinct_scores": [
+      "0.0000000",
+      "1.0000000"
+    ],
+    "score": 6,
+    "reasons": [
+      "長いPRTチェーン(node6)",
+      "想定誤答パターンをfeedbackvariablesで5個モデル化",
+      "具体的フィードバック文5件"
+    ],
+    "is_bad_named": false,
+    "name": "cos(2*x/3)の定積分",
+    "qtext": "次の定積分を計算せよ。 \\[\\int_{@a@}^{@b@}{@expr@}\\mathrm{d}x\\] [[input:ans1]] [[v",
+    "category": "integral"
+  },
+  {
+    "file": "11_derivative_cos^3(x)の微分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 3,
+    "n_feedback_texts": 3,
+    "distinct_scores": [
+      "0.0000000",
+      "1.0000000"
+    ],
+    "score": 6,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "想定誤答パターンをfeedbackvariablesで3個モデル化",
+      "具体的フィードバック文3件"
+    ],
+    "is_bad_named": false,
+    "name": "cos^3(x)の微分",
+    "qtext": "次の関数の導関数を求めよ。 \\[{@expr@}\\] [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  },
+  {
+    "file": "12_derivative_ln(abs(sin(x)))の微分.xml",
+    "n_nodes": 5,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 4,
+    "n_feedback_texts": 4,
+    "distinct_scores": [
+      "0.0000000",
+      "1.0000000"
+    ],
+    "score": 6,
+    "reasons": [
+      "長いPRTチェーン(node5)",
+      "想定誤答パターンをfeedbackvariablesで4個モデル化",
+      "具体的フィードバック文4件"
+    ],
+    "is_bad_named": false,
+    "name": "ln(abs(sin(x)))の微分",
+    "qtext": "次の関数の導関数を求めよ。 \\[{@expr@}\\] [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  },
+  {
+    "file": "14_derivative_log(cosh(x))の微分.xml",
+    "n_nodes": 4,
+    "distinct_tests": [
+      "AlgEquiv"
+    ],
+    "n_fbvars_lines": 0,
+    "n_feedback_texts": 3,
+    "distinct_scores": [
+      "0.1000000",
+      "0.3000000",
+      "0.5000000",
+      "1.0000000"
+    ],
+    "score": 6,
+    "reasons": [
+      "長いPRTチェーン(node4)",
+      "段階的部分点(4段階)",
+      "具体的フィードバック文3件"
+    ],
+    "is_bad_named": false,
+    "name": "log(cosh(x))の微分",
+    "qtext": "次の関数を\\(x\\)で微分せよ。 {@expr@} [[input:ans1]] [[validation:ans1]]",
+    "category": "derivative"
+  }
+]

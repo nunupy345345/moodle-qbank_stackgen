@@ -29,7 +29,7 @@
 5. goemaxima（Maxima）で式の構文と、誤答例が正答と数式的に異なることを検証します。NG の場合は、エラー内容を伝えて `max_retry` 回まで自動で再生成します。
 6. 検証に通った問題は、問題バンクへ直接登録されます。教員は Moodle 標準の問題バンク画面で確認・修正します。
 
-教員手作りの良問を埋め込み検索（RAG）してプロンプトに加える機能もあります（任意）。
+教員手作りの良問を埋め込み検索（RAG）してプロンプトに加える機能もあります（良問 26 問を同梱。初回の検索時に自動で取り込みます）。
 
 ## 必要なもの
 
@@ -156,16 +156,20 @@ pending → ocr_done → feedback_pending → (教員が確定) → approved（�
                                                       └→ requires_manual_review（検証NG・例外）
 ```
 
-## 任意のデータ（RAG・KC）
+## 同梱データ（RAG・KC）
 
-次のデータのうち、RAG コーパスはリポジトリに含まれていません。無くても動作します。
+次のデータはプラグインに同梱されています。追加の準備は要りません。
 
-- **RAG コーパス**: 手作りの良問の STACK XML を、埋め込みを計算して取り込みます。
-  ```bash
-  php question/bank/stackgen/cli/import_corpus.php --sourcedir=/path/to/xml_dir
-  ```
-  取り込み前は検索結果が空になり、通常のプロンプトのみで生成します。取り込みの動作は、`rag_enabled` と `rag_topk` で制御します。
-- **KC カタログ**: プラグインに同梱されています（`data/kc_master.csv`）。実験的な KC 機能が読みます。差し替える場合は、このファイルを編集します。
+- **RAG コーパス**（`data/corpus/`）: 手作りの良問 26 問の STACK XML と、PRT 構造のメタデータ（`index.json`）です。
+  - **自動取り込み**: RAG の検索が初めて走るとき、`qbank_stackgen_examples` テーブルが空なら、同梱の良問を自動で取り込みます。Gemini の API キーを設定したあと、最初に画像を処理するときです。`import_corpus.php` の実行は要りません。
+  - **初回の所要時間**: 良問の件数分（26 回）、埋め込み API を呼びます。数十秒かかることがありますが、2 回目以降は DB から読むだけです。
+  - **問題バンクへの影響**: ありません。取り込み先は、このプラグイン専用のテーブルだけです。問題バンクには、何も登録されません。受講者や教員にも見えません。
+  - **無効にする**: `rag_enabled` を OFF にすると、検索も自動取り込みも行いません。
+  - **良問を追加・差し替える**: 自分の XML を取り込むには、次のコマンドを実行します。`--force` を付けると、取り込み済みのファイルも埋め込みを再計算します。
+    ```bash
+    php question/bank/stackgen/cli/import_corpus.php --sourcedir=/path/to/xml_dir
+    ```
+- **KC カタログ**（`data/kc_master.csv`）: 実験的な KC 機能が読む、前提知識の一覧です。差し替える場合は、このファイルを編集します。
 
 ## 実験的機能
 
@@ -184,7 +188,7 @@ pending → ocr_done → feedback_pending → (教員が確定) → approved（�
 | スクリプト | 用途 |
 |---|---|
 | `cli/bulk_import.php` | フォルダ内の画像を、まとめてジョブ登録 |
-| `cli/import_corpus.php` | RAG コーパスの取り込み |
+| `cli/import_corpus.php` | RAG コーパスの追加取り込み・再計算（同梱分は自動取り込み） |
 | `cli/export_dataset.php` | 承認済みジョブの出力（LLM の下書きと、教員編集後の比較） |
 
 ## トラブルシューティング
@@ -209,7 +213,7 @@ GPL v3 以降（Moodle 本体と同じ）。`LICENSE` を参照してくださ�
 
 A Moodle question bank plugin that generates STACK questions (with PRT grading logic) from textbook images.
 
-**Pipeline:** image → Gemini OCR (LaTeX JSON) → AI-proposed wrong answers/feedback reviewed by the teacher → Gemini generates STACK XML → goemaxima CAS validation (auto-regeneration on failure) → direct import into the question bank. Optional RAG over hand-made questions.
+**Pipeline:** image → Gemini OCR (LaTeX JSON) → AI-proposed wrong answers/feedback reviewed by the teacher → Gemini generates STACK XML → goemaxima CAS validation (auto-regeneration on failure) → direct import into the question bank. RAG over 26 bundled hand-made questions (imported automatically on first use).
 
 **Requirements:** Moodle 4.5, [qtype_stack](https://github.com/maths/moodle-qtype_stack) (which itself requires `qbehaviour_dfexplicitvaildate`, `qbehaviour_dfcbmexplicitvaildate`, `qbehaviour_adaptivemultipart` and `qbank_importasversion`), a reachable [goemaxima](https://github.com/mathinstitut/goemaxima) server, a Gemini API key, and Moodle cron.
 

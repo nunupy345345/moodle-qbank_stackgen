@@ -14,7 +14,8 @@ defined('MOODLE_INTERNAL') || die();
 class rag_search {
 
     /**
-     * クエリ文字列に類似する例をコーパスから検索する。
+     * クエリ文字列に類似する例をコーパスから検索する。コーパスが空なら同梱の良問を先に取り込む
+     * (初回のみ。埋め込みAPIを良問の件数分呼ぶ)。
      *
      * @param string $querytext 検索クエリ(OCR結果の問題文)
      * @param int    $topk      取得件数
@@ -25,6 +26,11 @@ class rag_search {
      */
     public static function search(string $querytext, int $topk = 3): array {
         global $DB;
+
+        // 初回(コーパスが空)のみ、プラグイン同梱の良問を自動で取り込む。
+        if ($DB->count_records('qbank_stackgen_examples') === 0) {
+            corpus_importer::import_bundled();
+        }
 
         $examples = $DB->get_records('qbank_stackgen_examples');
         if (empty($examples) || $topk <= 0) {
