@@ -18,6 +18,20 @@ class corpus_importer {
     public const BUNDLED_DIR = __DIR__ . '/../../data/corpus/questions';
 
     /**
+     * 同梱コーパスのうち、まだテーブルに取り込まれていないファイルがあるか。
+     */
+    public static function has_pending_bundled(): bool {
+        global $DB;
+
+        $bundled = array_map('basename', glob(self::BUNDLED_DIR . '/*.xml') ?: []);
+        if (!$bundled) {
+            return false;
+        }
+        [$insql, $params] = $DB->get_in_or_equal($bundled);
+        return $DB->count_records_select('qbank_stackgen_examples', "sourcefile $insql", $params) < count($bundled);
+    }
+
+    /**
      * 同梱コーパスを取り込む。他のプロセスが取り込み中なら、その完了を待ってから戻る。
      *
      * @return array ['imported'=>int, 'skipped'=>int, 'failed'=>int, 'errors'=>string[]]
@@ -94,19 +108,21 @@ class corpus_importer {
                     throw new \moodle_exception('error_generic', 'qbank_stackgen', '', null, "qtextが空です: {$filename}");
                 }
 
+                $expression = rag_text::extract_expression($question);
                 $meta = $metabyfile[$filename] ?? [];
 
                 $record = (object)[
                     'sourcefile'      => $filename,
                     'category'        => self::extract_category($filename),
                     'qtext'           => $qtext,
+                    'expression'      => $expression,
                     'score'           => isset($meta['score']) ? (int)$meta['score'] : null,
                     'n_nodes'         => isset($meta['n_nodes']) ? (int)$meta['n_nodes'] : null,
                     'distinct_tests'  => isset($meta['distinct_tests'])
                         ? json_encode($meta['distinct_tests'], JSON_UNESCAPED_UNICODE) : null,
                     'distinct_scores' => isset($meta['distinct_scores'])
                         ? json_encode($meta['distinct_scores'], JSON_UNESCAPED_UNICODE) : null,
-                    'embedding'       => json_encode($embedder->embed($qtext), JSON_UNESCAPED_UNICODE),
+                    'embedding'       => json_encode($embedder->embed(rag_text::build($qtext, $expression)), JSON_UNESCAPED_UNICODE),
                     'timecreated'     => time(),
                 ];
 

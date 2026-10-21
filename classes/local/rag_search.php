@@ -17,7 +17,7 @@ class rag_search {
      * クエリ文字列に類似する例をコーパスから検索する。コーパスが空なら同梱の良問を先に取り込む
      * (初回のみ。埋め込みAPIを良問の件数分呼ぶ)。
      *
-     * @param string $querytext 検索クエリ(OCR結果の問題文)
+     * @param string $querytext 検索クエリ(OCR結果の問題文に式を足したもの。rag_text::build() で作る)
      * @param int    $topk      取得件数
      * @param string[] $exclude 検索対象から除外する sourcefile（アンケート用のleave-one-out生成で使用。通常は空）
      * @return array [['id'=>int, 'sourcefile'=>string, 'category'=>string, 'qtext'=>string,
@@ -28,8 +28,8 @@ class rag_search {
     public static function search(string $querytext, int $topk = 3, array $exclude = []): array {
         global $DB;
 
-        // 初回(コーパスが空)のみ、プラグイン同梱の良問を自動で取り込む。
-        if ($DB->count_records('qbank_stackgen_examples') === 0) {
+        // 同梱の良問が未取り込み(初回、またはアップグレードで埋め込みを作り直す必要が出たとき)なら自動で取り込む。
+        if (corpus_importer::has_pending_bundled()) {
             corpus_importer::import_bundled();
         }
 

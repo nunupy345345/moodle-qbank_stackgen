@@ -223,5 +223,24 @@ function xmldb_qbank_stackgen_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026102200, 'qbank', 'stackgen');
     }
 
+    if ($oldversion < 2026102201) {
+        $table = new xmldb_table('qbank_stackgen_examples');
+
+        $field = new xmldb_field('expression', XMLDB_TYPE_TEXT, null, null, null, null, null, 'category');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // 埋め込み対象が「問題文のみ」から「問題文＋式」に変わったため、同梱コーパスの行は
+        // 古い埋め込みのまま使えない。削除しておくと、次のRAG検索時に自動で再取り込みされる
+        // （同梱外のコーパスを cli/import_corpus.php で追加していた場合は --force で再計算すること）。
+        $bundled = array_map('basename', glob(\qbank_stackgen\local\corpus_importer::BUNDLED_DIR . '/*.xml') ?: []);
+        if ($bundled) {
+            $DB->delete_records_list('qbank_stackgen_examples', 'sourcefile', $bundled);
+        }
+
+        upgrade_plugin_savepoint(true, 2026102201, 'qbank', 'stackgen');
+    }
+
     return true;
 }

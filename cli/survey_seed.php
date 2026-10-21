@@ -27,7 +27,7 @@ require(__DIR__ . '/../../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 
 list($options, $unrecognized) = cli_get_params(
-    ['courseid' => 0, 'userid' => 0, 'only' => '', 'tracks' => 'traditional,kc,norag', 'dry-run' => false, 'help' => false],
+    ['courseid' => 0, 'userid' => 0, 'only' => '', 'tracks' => 'traditional,kc,norag', 'dry-run' => false, 'force' => false, 'help' => false],
     ['h' => 'help']
 );
 
@@ -38,12 +38,13 @@ if ($unrecognized) {
 
 if (!empty($options['help']) || empty($options['courseid'])) {
     echo "アンケート用の問題をOCRを飛ばしてジョブ登録し、leave-one-outのRAG除外を設定する。\n\n";
-    echo "Usage: php survey_seed.php --courseid=N [--userid=N] [--only=01,19] [--tracks=traditional,kc,norag] [--dry-run]\n";
+    echo "Usage: php survey_seed.php --courseid=N [--userid=N] [--only=01,19] [--tracks=traditional,kc,norag] [--dry-run] [--force]\n";
     echo "  --courseid=N  登録先のコースID（必須）\n";
     echo "  --userid=N    ジョブの登録者（省略時はサイト管理者）\n";
     echo "  --only=A,B    ファイル名先頭の番号で対象を絞る（例: 19,21）\n";
     echo "  --tracks=...  生成する版（既定: traditional,kc,norag の全部）\n";
     echo "  --dry-run     DBに書き込まず、登録予定だけ表示する\n";
+    echo "  --force       登録済みの問題でも別ジョブとして再登録する（検索ロジックを変えた後のやり直し用）\n";
     exit(empty($options['help']) ? 1 : 0);
 }
 
@@ -81,7 +82,8 @@ foreach ($data['items'] as $item) {
         continue;
     }
 
-    if ($DB->record_exists('qbank_stackgen_jobs', ['courseid' => $courseid, 'sourcefilename' => $file])) {
+    if (empty($options['force'])
+            && $DB->record_exists('qbank_stackgen_jobs', ['courseid' => $courseid, 'sourcefilename' => $file])) {
         echo "  [skip] {$file}（登録済み）\n";
         $skipped++;
         continue;
