@@ -4,7 +4,6 @@ cli/survey_dataset_export/
 
 # docker-compose.yaml の bind mount 先（開発環境のみ）
 fixtures_prt/
-fixtures_kc/
 text_img/
 
 node_modules/

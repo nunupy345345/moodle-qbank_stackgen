@@ -158,14 +158,14 @@ pending → ocr_done → feedback_pending → (教員が確定) → approved（�
 
 ## 任意のデータ（RAG・KC）
 
-このリポジトリには、次のデータは含まれていません。無くても動作します。
+次のデータのうち、RAG コーパスはリポジトリに含まれていません。無くても動作します。
 
 - **RAG コーパス**: 手作りの良問の STACK XML を、埋め込みを計算して取り込みます。
   ```bash
   php question/bank/stackgen/cli/import_corpus.php --sourcedir=/path/to/xml_dir
   ```
   取り込み前は検索結果が空になり、通常のプロンプトのみで生成します。取り込みの動作は、`rag_enabled` と `rag_topk` で制御します。
-- **KC カタログ**: 実験的な KC 機能が、プラグイン内の `fixtures_kc/kc_master.csv` を読みます。無い場合は、KC 一覧が空になります。
+- **KC カタログ**: プラグインに同梱されています（`data/kc_master.csv`）。実験的な KC 機能が読みます。差し替える場合は、このファイルを編集します。
 
 ## 実験的機能
 

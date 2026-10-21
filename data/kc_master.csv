@@ -1,0 +1,39 @@
+ID,日本語,英語,領域,前提知識,教科書の節,教科書での確度,学習指導要領での位置,高校範囲
+C01,計算,calculation,共通,,—,,中3・数学Ⅰ 数と式など,○
+C03,指数,exponent,共通,,4.1 指数関数と対数関数,○,数学Ⅱ 指数関数・対数関数（指数の拡張）,○
+C04,有理化,rationalization,共通,C01;C03,—,—,中3 平方根／数学Ⅰ 数と式（簡単な無理数の四則計算）,○
+C05,絶対値,absolute value,共通,,—,—,数学Ⅰ 数と式（実数の意味）に含まれると推測,△
+C06,三角関数の性質,property of trigonometric function,共通,,5.1 三角関数,◎,数学Ⅱ 三角関数（基本的な性質、加法定理と合成）,○
+C09,逆三角関数,inverse trigonometric function,共通,C06,5.3 逆三角関数,◎,見当たらない,×
+C10,双曲線関数,hyperbolic function,共通,,4.4 双曲線関数,◎,見当たらない,×
+D01,多項式の微分,differentiation of Polynomials,微分,,2.1 微分係数・導関数 / 2.3 微分,○,数学Ⅱ 微分・積分の考え（微分係数と導関数）,○
+D02,べき乗の微分,differentiation of Powers,微分,D01;C03,2.1 微分係数・導関数 / 2.3 微分,○,数学Ⅱ 微分・積分の考え（三次までの関数が中心）,○
+D12,ルートの微分,derivative of square root,微分,D02;C03,—,—,名称なし。合成関数の導関数に関連すると推測,△
+D03,積の微分,product rule,微分,D01,2.1 微分係数・導関数 / 2.3 微分,○,数学Ⅲ 微分法（関数の和，差，積及び商の導関数）,○
+D04,商の微分,quotient rule,微分,D01,2.1 微分係数・導関数 / 2.3 微分,○,数学Ⅲ 微分法（関数の和，差，積及び商の導関数）,○
+D05,合成関数の微分,chain rule,微分,D01;D02,3.2 合成関数の微分（附章 A.8）,◎,数学Ⅲ 微分法（合成関数の導関数）,○
+D06,指数関数の微分,derivative of exponential function,微分,,4.2 指数関数・対数関数の導関数,◎,数学Ⅲ 微分法（三角・指数・対数関数の導関数）,○
+D07,対数関数の微分,derivative of logarithmic function,微分,,4.2 指数関数・対数関数の導関数,◎,数学Ⅲ 微分法（三角・指数・対数関数の導関数）,○
+D08,三角関数の微分,derivative of trigonometric function,微分,C06,5.2 三角関数の導関数,◎,数学Ⅲ 微分法（三角・指数・対数関数の導関数）,○
+D09,逆三角関数の微分,derivative of inverse trigonometric function,微分,C09;D05,5.3 逆三角関数 / 3.4 逆関数とその微分,○,見当たらない,×
+D10,双曲線関数の微分,derivative of hyperbolic function,微分,C10;D06,4.4 双曲線関数,○,見当たらない,×
+D11,対数微分法,logarithmic differentiation,微分,D07;D05;D03,4.3 対数微分法,◎,対数関数の導関数の応用と推測（未確認）,△
+I01,多項積分,integration of polynomial,不定積分,D01;D02,3.1 原始関数,◎,数学Ⅱ 微分・積分の考え（不定積分と定積分。二次までが中心）,○
+I02,指数関数の積分,integration of exponential function,不定積分,D06,3.1 原始関数 / 4.2,○,数学Ⅲ 積分法（積分とその基本的な性質）,○
+I03,三角関数の積分,integration of trigonometric function,不定積分,D08;C06,3.1 原始関数 / 5.2,○,数学Ⅲ 積分法（積分とその基本的な性質）,○
+I04,logの積分,integration of logarithmic function,不定積分,I10;D07,3.5 部分積分,○,数学Ⅲ 積分法（部分積分法。1回の適用が中心）,○
+I06,逆三角関数の積分,integration of inverse trigonometric function,不定積分,D09,5.3 逆三角関数 / 6.1,○,見当たらない,×
+I07,合成関数の積分,integration of composite functions,不定積分,D05;I01,3.3 置換積分,○,数学Ⅲ 積分法（置換積分法 ax+b=t）,○
+I08,積分定数,integral constant,不定積分,,3.1 原始関数,○,数学Ⅱ 微分・積分の考え（不定積分）,○
+I09,置換積分,integration by substitution,不定積分,D05;I01,3.3 置換積分,◎,数学Ⅲ 積分法（置換積分法）,○
+I10,部分積分,integration by parts,不定積分,D03;I01,3.5 部分積分,◎,数学Ⅲ 積分法（部分積分法。1回の適用が中心）,○
+I11,部分分数分解,decomposition into partial fractions,不定積分,C01,6.1 有理関数の不定積分,◎,数学Ⅲ 積分法「いろいろな関数の不定積分・定積分」に含まれると推測,△
+F01,定積分,define integral,定積分,I01,7.1 定積分 / 7.2 微分積分学の基本定理,◎,数学Ⅱ 微分・積分の考え（不定積分と定積分）,○
+L01,極限値の直接計算（代入）,direct evaluation of limit,極限,,1.2 極限値,◎,数学Ⅲ 極限（関数の値の極限）,○
+L02,因数分解・約分による不定形の解消,resolving indeterminate form by factoring,極限,C01,1.2 極限値,○,数学Ⅲ 極限（式を目的に応じて変形して極限を求める）,○
+L04,無限大での極限（最高次の項で割る）,limit at infinity,極限,L01,1.2 極限値 / 附章 A.3,○,数学Ⅲ 極限（関数の値の極限）に含まれると推測,△
+L05,片側極限,one-sided limit,極限,C05;L01,1.2 極限値 / 附章 A.3,○,数学Ⅲ 極限（関数の値の極限）に含まれると推測,△
+L06,基本極限（eの定義・log(1+x)/x）,standard limits involving e and logarithm,極限,L01,1.2 極限値 / 4.2,○,数学Ⅲ 微分法（導関数の定義に基づく導関数の考察）に関連と推測,△
+L07,微分の定義としての極限の認識,limit as definition of derivative,極限,L01,2.1 微分係数・導関数,○,数学Ⅱ 微分・積分の考え（微分係数）に関連と推測,△
+F04,断面積による体積の積分の立式,volume by cross-sections,定積分,F01,12.1 面積 / 12.3 回転体の体積（断面積による体積の節は見当たらない）,△,数学Ⅲ 積分法（面積・体積・曲線の長さ）,○
+A01,接線の方程式（平行条件の利用を含む）,equation of tangent line,接線,D01;D02,2.2 接線,◎,数学Ⅲ 微分法（接線の方程式）,○

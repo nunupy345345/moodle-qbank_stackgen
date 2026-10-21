@@ -6,13 +6,13 @@ defined('MOODLE_INTERNAL') || die();
 /**
  * 前提知識（KC: Knowledge Component）の分類表。
  *
- * `fixtures/kc/kc_master.csv`（伊藤さんが整理した知識要素の一覧、docker-compose.yamlで
- * `fixtures_kc` として read-only マウント済み）を読み込む。約40件の静的な分類データで
+ * プラグイン同梱の `data/kc_master.csv`（伊藤さんが整理した知識要素の一覧。元データは
+ * 開発リポジトリの `fixtures/kc/kc_master.csv`）を読み込む。約40件の静的な分類データで
  * 埋め込み検索は不要なため、DBテーブルは持たずCSVを直接ソースにする。
  */
 class kc_catalog {
 
-    private const CSV_PATH = __DIR__ . '/../../fixtures_kc/kc_master.csv';
+    private const CSV_PATH = __DIR__ . '/../../data/kc_master.csv';
 
     /** @var array|null [['id'=>'D05', 'ja'=>'合成関数の微分', 'domain'=>'微分'], ...] */
     private static ?array $cache = null;
