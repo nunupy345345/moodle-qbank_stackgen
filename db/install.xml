@@ -60,6 +60,7 @@
         <FIELD NAME="id"          TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sourcefile"  TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="fixtures/prt/questions配下の元ファイル名"/>
         <FIELD NAME="category"    TYPE="char" LENGTH="60"  NOTNULL="false" COMMENT="integral/derivative等(index.json由来)"/>
+        <FIELD NAME="expression" TYPE="text" NOTNULL="false" COMMENT="問題の式(questionvariablesのexpr/ex、Maxima記法)。qtextと合わせて埋め込み、検索の手がかりにする"/>
         <FIELD NAME="qtext"       TYPE="text" NOTNULL="true" COMMENT="埋め込み対象の問題文(qtext)"/>
         <FIELD NAME="score"       TYPE="int"  LENGTH="5"  NOTNULL="false" COMMENT="build_fixtures.pyによるPRT作り込み度スコア"/>
         <FIELD NAME="n_nodes"     TYPE="int"  LENGTH="5"  NOTNULL="false" COMMENT="PRTノード数(index.json由来、Stage4 Few-shot用)"/>

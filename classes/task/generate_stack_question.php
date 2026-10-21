@@ -237,6 +237,11 @@ class generate_stack_question extends \core\task\adhoc_task {
         foreach ($problems as $i => $problem) {
             try {
                 $querytext = $problem['stack_question_text'] ?? ($problem['question_text'] ?? '');
+                if ($querytext !== '') {
+                    // 問題文だけでは式が含まれず類似度が潰れるため、式(LaTeX→Maxima風に変換)も検索対象にする。
+                    $querytext = \qbank_stackgen\local\rag_text::build($querytext,
+                        \qbank_stackgen\local\rag_text::latex_to_maxima((string)($problem['problem_expression'] ?? '')));
+                }
                 $results[$i] = $querytext !== '' ? \qbank_stackgen\local\rag_search::search($querytext, $topk) : [];
             } catch (\Throwable $e) {
                 mtrace("[qbank_stackgen] Job {$jobid}: RAG search failed for problem #" . ($i + 1)
