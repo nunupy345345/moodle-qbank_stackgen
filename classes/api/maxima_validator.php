@@ -8,10 +8,13 @@ defined('MOODLE_INTERNAL') || die();
  * 内部無矛盾かどうかを検証する。
  *
  * ここで見るのは「LLMが書いたMaxima式どうしの整合性」だけであり、
- * 問題文の内容を理解して ta が数学的に正しいかどうかまでは判定できない
+ * 問題文の内容を理解して ans（正答）が数学的に正しいかどうかまでは判定できない
  * （独立した正解を再計算する手段が現状ないため）。
- *   1. ta / wa1 / wa2 ... が Maxima の構文として壊れていないか
- *   2. 誤答例（wa*）が正答（ta）と数式的に完全一致していないか
+ *   1. ans / ans2 / ans3 ... が Maxima の構文として壊れていないか
+ *      （ans は questionvariables、ans2… や述語は PRT の feedbackvariables にある。両方を合わせて検証する。
+ *       旧形式の ta / wa1 … も受け付ける）
+ *   2. 誤答例（ans2…）が正答（ans）と数式的に完全一致していないか
+ *      （不定積分は、誤答例の導関数が被積分関数 expr と一致していないか）
  *      （一致していたら、その誤答ノードは意味をなさないPRTロジックのバグ）
  */
 class maxima_validator {
@@ -83,12 +86,37 @@ class maxima_validator {
         $qvtext = $textnodes->length > 0 ? $textnodes->item(0)->textContent : '';
         $qvtext = trim($qvtext);
 
-        if ($qvtext === '' || !preg_match('/^\s*ta\s*:/m', $qvtext)) {
-            return ["問題{$qnum}: questionvariables に ta の定義が見つかりません"];
+        // 正答の変数名。教員が作る問題と同じ ans を基本とし、旧形式の ta も受け付ける。
+        if ($qvtext === '' || !preg_match('/^\s*(ans|ta)\s*:/m', $qvtext, $tm)) {
+            return ["問題{$qnum}: questionvariables に ans（正答）の定義が見つかりません"];
+        }
+        $tavar = $tm[1];
+
+        // 誤答例の式（wa1, ...）や述語（waN_pred）は、教員が作る問題と同じく PRT の <feedbackvariables> に
+        // 書かれる。questionvariables と合わせた全体を、以降のCAS検証の文脈として使う
+        // （ta の存在確認だけは上で questionvariables 単独に対して済ませてある）。
+        $fvtext = '';
+        foreach ($question->getElementsByTagName('feedbackvariables') as $fvnode) {
+            $fvtextnodes = $fvnode->getElementsByTagName('text');
+            if ($fvtextnodes->length > 0) {
+                $fvtext .= "\n" . trim($fvtextnodes->item(0)->textContent);
+            }
+        }
+        $fvtext = trim($fvtext);
+        if ($fvtext !== '') {
+            // 末尾の文が ; や $ で終わっていないと、後ろに続ける式とつながって構文エラーになる。
+            if (!preg_match('/[;$]\s*$/', $fvtext)) {
+                $fvtext .= ';';
+            }
+            if (!preg_match('/[;$]\s*$/', $qvtext)) {
+                $qvtext .= ';';
+            }
+            $qvtext = $qvtext . "\n" . $fvtext;
         }
 
-        // wa1, wa2, ... のような誤答例変数名を抽出（ta以外の代入先。早期終了型/従来版・RAGなし版用）。
-        preg_match_all('/^\s*(wa\d+)\s*:/m', $qvtext, $m);
+        // 誤答例変数名を抽出（正答以外の代入先。早期終了型/従来版・RAGなし版用）。
+        // 教員の問題と同じ ans2, ans3, ...（ans1 は入力欄の名前）。旧形式の wa1, wa2, ... も受け付ける。
+        preg_match_all('/^\s*(wa\d+|ans[2-9]\d*)\s*:/m', $qvtext, $m);
         $wanames = $m[1];
 
         // wa1_pred(ex):=..., wa2_pred(ex):=... のような誤答判定述語関数名を抽出（KC診断版の全ノード評価モード用）。
@@ -99,26 +127,54 @@ class maxima_validator {
 
         if (empty($wanames) && empty($prednames)) {
             // 誤答例なし: ta単体の構文チェックのみ。
-            $response = $this->call_goemaxima_with_retry("{$qvtext} ta;");
+            $response = $this->call_goemaxima_with_retry("{$qvtext} {$tavar};");
             if ($this->looks_like_error($response)) {
-                $errors[] = "問題{$qnum}: ta の構文エラー: " . $this->extract_error_detail($response);
+                $errors[] = "問題{$qnum}: {$tavar} の構文エラー: " . $this->extract_error_detail($response);
             }
             return $errors;
         }
 
+        // 不定積分は、教員の問題と同じく「学生解答の導関数」で誤答判定する（PRTのノードの sans が
+        // diff(ans1, ...) になる）。この場合、誤答例の導関数が被積分関数 expr と一致していると、
+        // 積分定数の付け忘れ等を拾う共通ノードと重複して、誤答判定ノードが働かない。
+        $intvar = $this->derivative_judging_variable($question);
+
         foreach ($wanames as $waname) {
+            if ($intvar !== null) {
+                if (!preg_match('/^\s*(expr|ex)\s*:/m', $qvtext, $em)) {
+                    $errors[] = "問題{$qnum}: PRTが導関数で判定しているのに questionvariables に expr（被積分関数）の定義がありません";
+                    break;
+                }
+                $input = "{$qvtext} is(ratsimp(diff({$waname}, {$intvar}) - {$em[1]}) = 0);";
+                $response = $this->call_goemaxima_with_retry($input);
+
+                if ($this->looks_like_error($response)) {
+                    $errors[] = "問題{$qnum}: {$waname} の構文エラー: " . $this->extract_error_detail($response);
+                    continue;
+                }
+                $result = trim((string)$this->extract_last_result($response));
+                if ($result === 'true') {
+                    $errors[] = "問題{$qnum}: 誤答例 {$waname} の導関数が被積分関数 {$em[1]} と一致しています"
+                        . "（積分定数の付け忘れなど、導関数が一致する答えは共通ノードが担当するため、"
+                        . "導関数が一致しない誤答例にしてください）";
+                } else if ($result !== 'false') {
+                    $errors[] = "問題{$qnum}: {$waname} の検証結果を判定できませんでした（応答: {$result}）";
+                }
+                continue;
+            }
+
             $input = self::NORM_FUNC . " {$qvtext} "
-                . "is(ratsimp(stackgen_norm(ta)-stackgen_norm({$waname}))=0);";
+                . "is(ratsimp(stackgen_norm({$tavar})-stackgen_norm({$waname}))=0);";
             $response = $this->call_goemaxima_with_retry($input);
 
             if ($this->looks_like_error($response)) {
-                $errors[] = "問題{$qnum}: ta / {$waname} の構文エラー: " . $this->extract_error_detail($response);
+                $errors[] = "問題{$qnum}: {$tavar} / {$waname} の構文エラー: " . $this->extract_error_detail($response);
                 continue;
             }
 
             $result = trim((string)$this->extract_last_result($response));
             if ($result === 'true') {
-                $errors[] = "問題{$qnum}: 誤答例 {$waname} が正答 ta と数式的に一致しています（PRTの誤答判定が機能しません）";
+                $errors[] = "問題{$qnum}: 誤答例 {$waname} が正答 {$tavar} と数式的に一致しています（PRTの誤答判定が機能しません）";
             } else if ($result !== 'false') {
                 $errors[] = "問題{$qnum}: {$waname} の検証結果を判定できませんでした（応答: {$result}）";
             }
@@ -128,11 +184,11 @@ class maxima_validator {
         // 返さなければならない（正答した学生を誤ってKC欠落と判定してはならないため）。
         $freevars = null;
         foreach ($prednames as $predname) {
-            $input = "{$qvtext} is(not({$predname}(ta)));";
+            $input = "{$qvtext} is(not({$predname}({$tavar})));";
             $response = $this->call_goemaxima_with_retry($input);
 
             if ($this->looks_like_error($response)) {
-                $errors[] = "問題{$qnum}: ta / {$predname} の構文エラー: " . $this->extract_error_detail($response);
+                $errors[] = "問題{$qnum}: {$tavar} / {$predname} の構文エラー: " . $this->extract_error_detail($response);
                 continue;
             }
 
@@ -141,7 +197,7 @@ class maxima_validator {
                 continue;
             }
             if ($result === 'false') {
-                $errors[] = "問題{$qnum}: 誤答判定述語 {$predname} が正答 ta に対してtrueを返しています"
+                $errors[] = "問題{$qnum}: 誤答判定述語 {$predname} が正答 {$tavar} に対してtrueを返しています"
                     . "（正答した学生を誤ってKC欠落と判定してしまいます）";
                 continue;
             }
@@ -150,14 +206,14 @@ class maxima_validator {
             // （x, c など）が残っていると、Maximaの is() は一般にその大小・真偽を決定できないため、
             // 具体的な数値を代入した上で再検証する（STACKの等価判定でも使われる数値サンプリング）。
             if ($freevars === null) {
-                $freevars = $this->free_vars($qvtext);
+                $freevars = $this->free_vars($qvtext, $tavar);
             }
-            $numericresult = $this->check_predicate_numeric($qvtext, $predname, $freevars);
+            $numericresult = $this->check_predicate_numeric($qvtext, $predname, $freevars, $tavar);
             if ($numericresult === 'true') {
                 continue;
             }
             if ($numericresult === 'false') {
-                $errors[] = "問題{$qnum}: 誤答判定述語 {$predname} が正答 ta に対してtrueを返しています"
+                $errors[] = "問題{$qnum}: 誤答判定述語 {$predname} が正答 {$tavar} に対してtrueを返しています"
                     . "（正答した学生を誤ってKC欠落と判定してしまいます・数値代入検証）";
                 continue;
             }
@@ -169,10 +225,23 @@ class maxima_validator {
     }
 
     /**
-     * ta に含まれる自由変数名の一覧を取得する（例: [x, c]）。取得できなければ空配列。
+     * PRTのノードが学生解答の導関数 diff(ans1, 変数) で判定しているか（不定積分の誤答判定方式）を調べ、
+     * そうであれば積分変数名を返す。そうでなければ null。
      */
-    private function free_vars(string $qvtext): array {
-        $response = $this->call_goemaxima_with_retry("{$qvtext} listofvars(ta);");
+    private function derivative_judging_variable(\DOMElement $question): ?string {
+        foreach ($question->getElementsByTagName('sans') as $sansel) {
+            if (preg_match('/^\s*diff\(\s*ans1\s*,\s*([A-Za-z]\w*)\s*\)\s*$/', $sansel->textContent, $m)) {
+                return $m[1];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 正答（ans）に含まれる自由変数名の一覧を取得する（例: [x, c]）。取得できなければ空配列。
+     */
+    private function free_vars(string $qvtext, string $tavar = 'ans'): array {
+        $response = $this->call_goemaxima_with_retry("{$qvtext} listofvars({$tavar});");
         if ($this->looks_like_error($response)) {
             return [];
         }
@@ -189,7 +258,7 @@ class maxima_validator {
      * その結果を返す（代入後は自由変数が残らないため、Maximaは通常は確定的に判定できる）。
      * 全サンプルで判定不能だった場合は 'unknown' を返す。
      */
-    private function check_predicate_numeric(string $qvtext, string $predname, array $vars): string {
+    private function check_predicate_numeric(string $qvtext, string $predname, array $vars, string $tavar = 'ans'): string {
         if (empty($vars)) {
             return 'unknown';
         }
@@ -207,7 +276,7 @@ class maxima_validator {
                 $substs[] = "{$var}=" . ($values[$i] ?? ($i + 2));
             }
             $substlist = implode(',', $substs);
-            $input = "{$qvtext} is(not({$predname}(subst([{$substlist}], ta))));";
+            $input = "{$qvtext} is(not({$predname}(subst([{$substlist}], {$tavar}))));";
             $response = $this->call_goemaxima_with_retry($input);
 
             if ($this->looks_like_error($response)) {
