@@ -345,6 +345,29 @@ class maxima_validator {
                 . "（型A「特定の関数・部分式を含む」、型D「次数・係数」など）で判定してください";
         }
 
+        // 条件6: 各KCの誤答（そのKCだけが欠けた答え）で、自分以外のKCノードが少なくとも1つ真になること。
+        // 全ノードが偽になる答えは、どのKCが欠けたか特定できず診断として成立しない。
+        if (empty($errors) && count($kcnodes) >= 2) {
+            foreach ($variants as $k => $variant) {
+                $othertrue = 0;
+                foreach ($kcnodes as $j => $node) {
+                    if ($j === $k) {
+                        continue;
+                    }
+                    [$r] = $this->kc_chain_test($qvtext, $text($node, 'sans'), $text($node, 'tans'), '(' . $variant . ')');
+                    if ($r === 'true') {
+                        $othertrue++;
+                    }
+                }
+                if ($othertrue === 0) {
+                    $errors[] = "問題{$qnum}: 誤答 {$variant} では、そのKC以外の診断ノードがすべて偽になり、"
+                        . "どのKCが欠けたか特定できません。他のKCノードは「そのKC以外の特徴」だけを見る判定式にして、"
+                        . "この誤答でも少なくとも1つは真になるようにしてください"
+                        . "（例: 型A「特定の関数・部分式を含む」、型D「次数・係数」は、答えが大きく崩れても影響を受けにくい）";
+                }
+            }
+        }
+
         // KCノードどうしで同一の判定式を使わない（別々のKCを区別できないため）。
         $seen = [];
         foreach ($kcnodes as $k => $node) {
