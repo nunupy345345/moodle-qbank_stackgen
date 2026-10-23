@@ -93,6 +93,7 @@ $string['kc_import_category_name']       = 'STACKGen Auto-generated (KC diagnosi
 $string['human_import_category_name']    = 'STACKGen human-made (survey baseline)';
 $string['import_success']                = 'Registered in the question bank.';
 $string['import_view_bank']              = 'View in question bank';
+$string['import_bank_deleted']           = 'The question has been deleted.';
 
 // KC diagnosis page (separate page). Fully independent from upload.php/review.php.
 $string['kc_page_title']                 = 'KC diagnosis version (knowledge-component-based wrong answers)';

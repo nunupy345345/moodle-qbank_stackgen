@@ -111,9 +111,17 @@
         <p class="mb-1 small font-weight-bold text-success">
             {{# str }} import_success, qbank_stackgen {{/ str }}
         </p>
+        {{# bankexists }}
         <a href="{{bankurl}}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
             {{# str }} import_view_bank, qbank_stackgen {{/ str }}
         </a>
+        {{/ bankexists }}
+        {{^ bankexists }}
+        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>
+            {{# str }} import_view_bank, qbank_stackgen {{/ str }}
+        </button>
+        <span class="small text-muted ml-2">{{# str }} import_bank_deleted, qbank_stackgen {{/ str }}</span>
+        {{/ bankexists }}
     </div>
     {{/ isapproved }}
     {{# haserror }}
@@ -413,9 +421,17 @@
         {{/ norag_haserror }}
 
         {{# norag_isapproved }}
+        {{# norag_bankexists }}
         <a href="{{norag_bankurl}}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">
             {{# str }} import_view_bank, qbank_stackgen {{/ str }}
         </a>
+        {{/ norag_bankexists }}
+        {{^ norag_bankexists }}
+        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+            {{# str }} import_view_bank, qbank_stackgen {{/ str }}
+        </button>
+        <span class="small text-muted ml-2">{{# str }} import_bank_deleted, qbank_stackgen {{/ str }}</span>
+        {{/ norag_bankexists }}
         {{/ norag_isapproved }}
     </div>
     {{/ hasnorag }}
