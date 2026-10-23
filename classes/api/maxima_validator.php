@@ -288,6 +288,7 @@ class maxima_validator {
 
         $errors = [];
         $truefound = false;
+        $ansvalue = null;
         foreach ($kcnodes as $k => $node) {
             $label = "KC診断ノード" . ($k + 1);
             $sans = $text($node, 'sans');
@@ -299,8 +300,15 @@ class maxima_validator {
 
             [$ref, $refdetail] = $this->kc_chain_test($qvtext, $sans, $tans, $reference);
             if ($ref !== 'true') {
+                // LLMは integrate / diff がMaximaで実際に返す式の形を知らない（展開された多項式など、
+                // 教科書の形と定数だけ違う別の形になる）ため、実際の値を伝えて次の試行で合わせさせる。
+                if ($ansvalue === null) {
+                    $ansvalue = $this->kc_chain_answer_value($qvtext, $reference);
+                }
                 $errors[] = "問題{$qnum}: {$label}（判定式 {$sans} = {$tans}）が、正答では真になりません"
-                    . "（応答: " . ($refdetail !== '' ? $refdetail : $ref) . "）。正答を使えば真になる判定式にしてください";
+                    . "（応答: " . ($refdetail !== '' ? $refdetail : $ref) . "）。正答を使えば真になる判定式にしてください"
+                    . ($ansvalue !== '' ? "。ans1 に入れる正答 {$reference} をMaximaで評価した実際の値は {$ansvalue} です。"
+                        . "この形（展開された式など）で成り立つ判定式にすること" : '');
                 continue;
             }
 
@@ -350,6 +358,17 @@ class maxima_validator {
         }
 
         return $errors;
+    }
+
+    /**
+     * 正答式をMaximaで評価した実際の値（展開した形）の文字列を返す。取得できなければ空文字。
+     */
+    private function kc_chain_answer_value(string $qvtext, string $answerexpr): string {
+        $response = $this->call_goemaxima_with_retry("{$qvtext} string(expand(ratsimp({$answerexpr})));");
+        if ($this->looks_like_error($response)) {
+            return '';
+        }
+        return trim(trim((string)$this->extract_last_result($response)), '"');
     }
 
     /**
