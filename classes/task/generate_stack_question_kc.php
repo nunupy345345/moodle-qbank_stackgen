@@ -193,7 +193,10 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
                     continue;
                 }
                 try {
-                    $result = $validator->validate_one($debugxml[$i], $i + 1);
+                    // chain型: 誤答例（KCごとに「そのKCだけが欠けた答え」）を、判定式の検証に使う。
+                    $variants = array_map(
+                        fn($w) => (string)($w['expression'] ?? ''), $feedbackproblems[$i]['wronganswers'] ?? []);
+                    $result = $validator->validate_one($debugxml[$i], $i + 1, ['mode' => 'kc_chain', 'variants' => $variants]);
                 } catch (\Throwable $e) {
                     $laststage = 'Stage5 CAS validator error';
                     $lasterror = "問題" . ($i + 1) . ": " . $e->getMessage();

@@ -56,10 +56,12 @@ class maxima_validator {
      *
      * @param string $questionxml  単一の <question>...</question> ブロック
      * @param int    $qnum  エラーメッセージに含める問題番号
+     * @param array  $options  ['mode' => 'kc_chain', 'variants' => string[]] を渡すと、KC診断版（chain型）として
+     *                         検証する。variants は KC診断ノードと同じ順序で並んだ「そのKCだけが欠けた答え」のMaxima式。
      * @return array{valid: bool, errors: string[]}
      * @throws \moodle_exception goemaximaとの通信エラーのとき
      */
-    public function validate_one(string $questionxml, int $qnum): array {
+    public function validate_one(string $questionxml, int $qnum, array $options = []): array {
         $dom = new \DOMDocument();
         if (!@$dom->loadXML($questionxml)) {
             return ['valid' => false, 'errors' => ["問題{$qnum}: 生成されたXMLがパースできません（整形式のXMLではありません）"]];
@@ -70,14 +72,14 @@ class maxima_validator {
             return ['valid' => false, 'errors' => ["問題{$qnum}: <question> 要素が見つかりません"]];
         }
 
-        $errors = $this->validate_question($questions->item(0), $qnum);
+        $errors = $this->validate_question($questions->item(0), $qnum, $options);
         return ['valid' => empty($errors), 'errors' => $errors];
     }
 
     /**
      * @return string[] このquestionで見つかったエラーメッセージ（なければ空配列）
      */
-    private function validate_question(\DOMElement $question, int $qnum): array {
+    private function validate_question(\DOMElement $question, int $qnum, array $options = []): array {
         $qvnodes = $question->getElementsByTagName('questionvariables');
         if ($qvnodes->length === 0) {
             return ["問題{$qnum}: <questionvariables> が見つかりません"];
@@ -112,6 +114,11 @@ class maxima_validator {
                 $qvtext .= ';';
             }
             $qvtext = $qvtext . "\n" . $fvtext;
+        }
+
+        // KC診断版（chain型）: ノードごとの判定式が、正答で真・「そのKCだけが欠けた答え」で偽になるかを確かめる。
+        if (($options['mode'] ?? '') === 'kc_chain') {
+            return $this->validate_kc_chain($question, $qnum, $qvtext, $tavar, array_values((array)($options['variants'] ?? [])));
         }
 
         // 誤答例変数名を抽出（正答以外の代入先。早期終了型/従来版・RAGなし版用）。
@@ -222,6 +229,145 @@ class maxima_validator {
         }
 
         return $errors;
+    }
+
+    /**
+     * KC診断版（chain型）PRTの検証。
+     *
+     * PRTは「ノード1=正誤判定、ノード2以降=KCごとに1ノード」で、各KCノードは「そのKCを使えている」ことを
+     * 学生の最終解答（ans1）の特徴で判定する（真=使えている）。そこで次の2つを機械的に確かめる。
+     *   1. 正答（不定積分は 正答+C）を ans1 に入れると、すべてのKCノードの判定が真になる。
+     *   2. そのKCだけが欠けた答え（variants[k]）を ans1 に入れると、k番目のKCノードの判定が偽になる。
+     *      （真になるなら、そのノードはKCの欠落を区別できない）
+     *   3. KCが2つ以上あるとき、少なくとも1つのKCノードが、他のKCが欠けた答え（variants[j]、j≠k。そのKCkは
+     *      使えている答え）で真になる。全ノードがどれでも偽だと、判定式が「答えが正答と一致するか」とほぼ同じで、
+     *      どのKCが欠けたかを診断できない（掛け算でつながるKCは、一方が欠けると他方の比が偽になるため、
+     *      すべてのノードが独立である必要はない。chain型は後ろのKCほど前のKCに依存してよい）。
+     *      あわせて、KCノードどうしが同一の判定式にならないことも確かめる。
+     *
+     * @param string[] $variants KCノードと同じ順序の「そのKCだけが欠けた答え」（Maxima式）
+     * @return string[] エラーメッセージ（なければ空配列）
+     */
+    private function validate_kc_chain(
+        \DOMElement $question, int $qnum, string $qvtext, string $tavar, array $variants
+    ): array {
+        $prts = $question->getElementsByTagName('prt');
+        if ($prts->length === 0) {
+            return ["問題{$qnum}: <prt> が見つかりません"];
+        }
+        $prt = $prts->item(0);
+
+        $text = function (\DOMElement $parent, string $tag): string {
+            $el = $parent->getElementsByTagName($tag)->item(0);
+            return $el ? trim($el->textContent) : '';
+        };
+
+        $firstname = $text($prt, 'firstnodename');
+        $first = null;
+        $kcnodes = [];
+        foreach ($prt->childNodes as $child) {
+            if (!($child instanceof \DOMElement) || $child->nodeName !== 'node') {
+                continue;
+            }
+            if ($first === null && $text($child, 'name') === $firstname) {
+                $first = $child;
+            } else {
+                $kcnodes[] = $child;
+            }
+        }
+        if ($first === null) {
+            return ["問題{$qnum}: firstnodename が指すノードが見つかりません"];
+        }
+        if (count($kcnodes) !== count($variants)) {
+            return ["問題{$qnum}: KC診断ノードの数(" . count($kcnodes) . ")が、KCごとの誤答例の数("
+                . count($variants) . ")と一致しません（誤答例1つにつきKC診断ノードを1つ、同じ順序で作ること）"];
+        }
+
+        // 不定積分はノード1が Int。学生は積分定数を付けて答えるので、正答側にも + C を付けて確かめる。
+        $reference = $text($first, 'answertest') === 'Int' ? "({$tavar}+C)" : $tavar;
+
+        $errors = [];
+        $truefound = false;
+        foreach ($kcnodes as $k => $node) {
+            $label = "KC診断ノード" . ($k + 1);
+            $sans = $text($node, 'sans');
+            $tans = $text($node, 'tans');
+            if ($sans === '' || $tans === '') {
+                $errors[] = "問題{$qnum}: {$label}: sans または tans が空です";
+                continue;
+            }
+
+            [$ref, $refdetail] = $this->kc_chain_test($qvtext, $sans, $tans, $reference);
+            if ($ref !== 'true') {
+                $errors[] = "問題{$qnum}: {$label}（判定式 {$sans} = {$tans}）が、正答では真になりません"
+                    . "（応答: " . ($refdetail !== '' ? $refdetail : $ref) . "）。正答を使えば真になる判定式にしてください";
+                continue;
+            }
+
+            [$var, $vardetail] = $this->kc_chain_test($qvtext, $sans, $tans, '(' . $variants[$k] . ')');
+            if ($var === 'true') {
+                $errors[] = "問題{$qnum}: {$label}（判定式 {$sans} = {$tans}）が、そのKCだけが欠けた答え {$variants[$k]} でも"
+                    . "真になります（KCの欠落を区別できません）。その答えでは偽になる判定式にしてください";
+                continue;
+            } else if ($var !== 'false') {
+                $errors[] = "問題{$qnum}: {$label}（判定式 {$sans} = {$tans}）を、そのKCだけが欠けた答え {$variants[$k]} で"
+                    . "判定できませんでした（応答: " . ($vardetail !== '' ? $vardetail : $var) . "）";
+                continue;
+            }
+
+            // 条件3: 少なくとも1つのKCノードが、他のKCが欠けた答え（このKCは使えている答え）で真になること。
+            if (count($kcnodes) >= 2 && !$truefound) {
+                foreach ($variants as $j => $other) {
+                    if ($j === $k) {
+                        continue;
+                    }
+                    [$r] = $this->kc_chain_test($qvtext, $sans, $tans, '(' . $other . ')');
+                    if ($r === 'true') {
+                        $truefound = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (empty($errors) && count($kcnodes) >= 2 && !$truefound) {
+            $errors[] = "問題{$qnum}: どのKC診断ノードの判定式も、他のKCが欠けた答え（そのKCは使えている答え）では偽になります。"
+                . "これでは「答えが正答と一致するか」とほぼ同じで、どのKCが欠けたか診断できません。"
+                . "特に最初のKCノードは、他のKCの欠落に左右されない、そのKCだけの特徴"
+                . "（型A「特定の関数・部分式を含む」、型D「次数・係数」など）で判定してください";
+        }
+
+        // KCノードどうしで同一の判定式を使わない（別々のKCを区別できないため）。
+        $seen = [];
+        foreach ($kcnodes as $k => $node) {
+            $key = preg_replace('/\s+/', '', $text($node, 'sans') . '|' . $text($node, 'tans'));
+            if (isset($seen[$key])) {
+                $errors[] = "問題{$qnum}: KC診断ノード" . ($seen[$key] + 1) . "とKC診断ノード" . ($k + 1)
+                    . "が同一の判定式です（別々のKCを区別できません）";
+            } else {
+                $seen[$key] = $k;
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * KC診断ノードの判定（sans を tans と AlgEquiv で比べる）を、ans1 に $answerexpr を入れて評価する。
+     * 真偽値どうしは等号、式どうしは ratsimp(差)=0 で比べる（STACKのAlgEquivの簡易版）。
+     *
+     * @return array [結果('true'|'false'|'error'|その他の応答), エラー詳細]
+     */
+    private function kc_chain_test(string $qvtext, string $sans, string $tans, string $answerexpr): array {
+        $input = "{$qvtext} ans1: {$answerexpr}; "
+            . "block([r, t], r: ev({$sans}), t: ev({$tans}), "
+            . "if member(r, [true, false]) or member(t, [true, false]) then is(r = t) else is(ratsimp(r - t) = 0));";
+        $response = $this->call_goemaxima_with_retry($input);
+
+        if ($this->looks_like_error($response)) {
+            return ['error', $this->extract_error_detail($response)];
+        }
+        return [trim((string)$this->extract_last_result($response)), ''];
     }
 
     /**
