@@ -43,7 +43,7 @@ class get_kc_job_statuses extends external_api {
             [$courseid, $USER->id],
             'id DESC',
             'id, courseid, ocr_result, track_kc, kc_status, kc_feedback_result, kc_feedback_confirmed, ' .
-                'kc_xml_result, kc_error_msg, kc_retry_count, kc_question_category_id',
+                'kc_xml_result, kc_error_msg, kc_retry_count, kc_question_ids, kc_question_category_id',
             0, 20
         );
 
