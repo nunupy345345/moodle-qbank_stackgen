@@ -164,6 +164,7 @@ class get_job_statuses extends external_api {
                 'autoprocessing'    => new external_value(PARAM_BOOL, 'Being auto-processed by cron'),
                 'isapproved'        => new external_value(PARAM_BOOL, 'Registered in the question bank'),
                 'bankurl'           => new external_value(PARAM_URL, 'Question bank category URL', VALUE_DEFAULT, ''),
+                'bankexists'        => new external_value(PARAM_BOOL, 'Registered questions still exist in the question bank', VALUE_DEFAULT, true),
                 'confirmurl'        => new external_value(PARAM_URL, 'Review confirm endpoint'),
                 'sesskey'           => new external_value(PARAM_RAW, 'Session key'),
                 'courseid'          => new external_value(PARAM_INT, 'Course id'),
@@ -194,6 +195,7 @@ class get_job_statuses extends external_api {
                 'norag_error_msg'            => new external_value(PARAM_RAW, 'No-RAG error message', VALUE_DEFAULT, ''),
                 'norag_isapproved'           => new external_value(PARAM_BOOL, 'No-RAG: registered in the question bank'),
                 'norag_bankurl'              => new external_value(PARAM_URL, 'No-RAG question bank category URL', VALUE_DEFAULT, ''),
+                'norag_bankexists'           => new external_value(PARAM_BOOL, 'No-RAG: registered questions still exist in the question bank', VALUE_DEFAULT, true),
                 'norag_confirmurl'           => new external_value(PARAM_URL, 'No-RAG review confirm endpoint'),
             ])
         );

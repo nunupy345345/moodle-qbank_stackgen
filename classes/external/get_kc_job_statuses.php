@@ -152,6 +152,7 @@ class get_kc_job_statuses extends external_api {
                 'error_msg'         => new external_value(PARAM_RAW, 'Error message'),
                 'isapproved'        => new external_value(PARAM_BOOL, 'Registered in the question bank'),
                 'bankurl'           => new external_value(PARAM_URL, 'Question bank category URL', VALUE_DEFAULT, ''),
+                'bankexists'        => new external_value(PARAM_BOOL, 'Registered questions still exist in the question bank', VALUE_DEFAULT, true),
                 'confirmurl'        => new external_value(PARAM_URL, 'Review confirm endpoint'),
                 'startactionurl'    => new external_value(PARAM_URL, 'kc_review.php URL'),
                 'sesskey'           => new external_value(PARAM_RAW, 'Session key'),
