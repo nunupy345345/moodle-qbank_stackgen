@@ -12,6 +12,8 @@ define([], function() {
 
     var states = {};
     var lastActivity = 0;
+    // 直近に操作された確認欄（"版:ジョブID"）。操作秒数はこの欄にだけ足す（複数の欄が同時に見えていても二重に数えない）。
+    var activeKey = '';
     var started = false;
 
     /**
@@ -70,7 +72,7 @@ define([], function() {
                     st.opened = true;
                     sendOpen(def.track, panel.getAttribute('data-jobid'));
                 }
-                if (active) {
+                if (active && key === activeKey) {
                     st.seconds += 1;
                 }
             });
@@ -87,8 +89,18 @@ define([], function() {
             }
             started = true;
             ['mousemove', 'mousedown', 'keydown', 'scroll', 'input', 'touchstart'].forEach(function(name) {
-                document.addEventListener(name, function() {
+                document.addEventListener(name, function(e) {
                     lastActivity = Date.now();
+                    var target = e.target && e.target.closest ? e.target : null;
+                    if (!target) {
+                        return;
+                    }
+                    PANELS.forEach(function(def) {
+                        var panel = target.closest(def.selector + '[data-jobid]');
+                        if (panel) {
+                            activeKey = def.track + ':' + panel.getAttribute('data-jobid');
+                        }
+                    });
                 }, {capture: true, passive: true});
             });
             window.setInterval(tick, 1000);
