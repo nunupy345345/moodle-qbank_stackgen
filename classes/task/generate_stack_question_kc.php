@@ -114,7 +114,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             $generator = new \qbank_stackgen\api\kc_feedback_generator();
             $feedback  = $generator->run($problems, $ragresults);
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                => $jobid,
                 'kc_status'         => 'feedback_pending',
                 'kc_feedback_result' => json_encode($feedback, JSON_UNESCAPED_UNICODE),
@@ -123,7 +123,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             mtrace("[qbank_stackgen] KC Job {$jobid}: KC feedback draft generated, awaiting teacher review.");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'kc_status'    => 'requires_manual_review',
                 'kc_error_msg' => 'KC Stage3 feedback error: ' . $e->getMessage(),
@@ -143,7 +143,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
         $maxretry = max(1, (int)(get_config('qbank_stackgen', 'max_retry') ?: 3));
         $apikey   = get_config('qbank_stackgen', 'google_api_key');
         if (empty($apikey)) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'kc_status'    => 'requires_manual_review',
                 'kc_error_msg' => 'KC Stage4 LLM error: google_api_key が設定されていません',
@@ -214,7 +214,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
                 $newpending[] = $i;
             }
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'             => $jobid,
                 'kc_xml_result'  => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<quiz>\n"
                     . implode("\n\n", array_filter(array_map(
@@ -228,7 +228,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             ]);
 
             if (empty($newpending)) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'             => $jobid,
                     'kc_status'      => 'llm_done',
                     'timemodified'   => time(),
@@ -244,7 +244,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             $pending = $newpending;
         }
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'           => $jobid,
             'kc_status'    => 'requires_manual_review',
             'kc_error_msg' => "KC {$laststage} after {$maxretry} attempts (未解決" . count($pending) . "/{$count}問): {$lasterror}",
@@ -270,7 +270,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             $result = \qbank_stackgen\question_importer::import(
                 $importjob, \qbank_stackgen\question_importer::CATEGORY_MARKER_KC);
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                       => $jobid,
                 'kc_status'                => 'approved',
                 'kc_question_ids'          => json_encode($result['questionids']),
@@ -282,7 +282,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
                 . count($result['questionids']) . " question(s)).");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'kc_status'    => 'requires_manual_review',
                 'kc_error_msg' => 'KC Stage6 import error: ' . $e->getMessage(),

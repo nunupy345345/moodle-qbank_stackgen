@@ -77,5 +77,21 @@
         <INDEX NAME="sourcefile_idx" UNIQUE="true" FIELDS="sourcefile"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="qbank_stackgen_events" COMMENT="所要時間の計測用イベントログ（ジョブ・版ごとの状態遷移、確認画面の作業時間など）">
+      <FIELDS>
+        <FIELD NAME="id"        TYPE="int"    LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="jobid"     TYPE="int"    LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="track"     TYPE="char"   LENGTH="20" NOTNULL="true" DEFAULT="" COMMENT="traditional / norag / kc。版に依らないイベントは空"/>
+        <FIELD NAME="event"     TYPE="char"   LENGTH="40" NOTNULL="true" COMMENT="created / status / retry / confirmed / review_open / review_active"/>
+        <FIELD NAME="detail"    TYPE="char"   LENGTH="255" NOTNULL="false" COMMENT="status=新しい状態、retry=回数、review_active=操作していた秒数"/>
+        <FIELD NAME="eventtime" TYPE="number" LENGTH="16" DECIMALS="3" NOTNULL="true" COMMENT="UNIX時刻（ミリ秒精度）"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="jobid_idx" UNIQUE="false" FIELDS="jobid"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

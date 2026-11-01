@@ -91,7 +91,7 @@ foreach ($jobs as $job) {
             continue;
         }
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'         => $job->id,
             $confirmcol  => $json,
             'timemodified' => time(),

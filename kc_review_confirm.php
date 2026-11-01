@@ -72,7 +72,13 @@ foreach ($decoded['problems'] as $p) {
     $confirmed['problems'][] = ['name' => $name, 'questiontext' => $questiontext, 'wronganswers' => $wronganswers];
 }
 
-$DB->update_record('qbank_stackgen_jobs', (object)[
+// 教員が確認画面で実際に操作していた秒数（画面側で測定）。所要時間の集計用。
+$activesec = optional_param('activesec', -1, PARAM_FLOAT);
+if ($activesec >= 0) {
+    \qbank_stackgen\local\event_log::log($jobid, 'kc', 'review_active', (string)round($activesec, 1));
+}
+
+\qbank_stackgen\local\event_log::update_job((object)[
     'id'                    => $jobid,
     'kc_feedback_confirmed' => json_encode($confirmed, JSON_UNESCAPED_UNICODE),
     'timemodified'          => time(),

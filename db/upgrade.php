@@ -242,5 +242,22 @@ function xmldb_qbank_stackgen_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026102201, 'qbank', 'stackgen');
     }
 
+    if ($oldversion < 2026110101) {
+        // 所要時間の計測用イベントログ表。
+        $table = new xmldb_table('qbank_stackgen_events');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('jobid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('track', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, '');
+        $table->add_field('event', XMLDB_TYPE_CHAR, '40', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('detail', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+        $table->add_field('eventtime', XMLDB_TYPE_NUMBER, '16, 3', null, XMLDB_NOTNULL, null, null);
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_index('jobid_idx', XMLDB_INDEX_NOTUNIQUE, ['jobid']);
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+        upgrade_plugin_savepoint(true, 2026110101, 'qbank', 'stackgen');
+    }
+
     return true;
 }

@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $resumestatus = 'pending';
         }
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'           => $jobid,
             'status'       => $resumestatus,
             'error_msg'    => null,
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $resumestatus = '';
         }
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'                => $jobid,
             'norag_status'      => $resumestatus,
             'norag_error_msg'   => null,
@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $job = $DB->get_record('qbank_stackgen_jobs',
             ['id' => $jobid, 'courseid' => $courseid, 'userid' => $USER->id], '*', MUST_EXIST);
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'                 => $jobid,
             'status'             => 'feedback_pending',
             'feedback_confirmed' => null,
@@ -180,6 +180,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'timecreated'       => $now,
         'timemodified'      => $now,
     ]);
+
+    \qbank_stackgen\local\event_log::log((int)$jobid, '', 'created', $sourcefilename);
 
     // Queue Adhoc Task.
     $task = new \qbank_stackgen\task\generate_stack_question();

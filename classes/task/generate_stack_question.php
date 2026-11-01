@@ -61,7 +61,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 $result = $ocr->run($job->image_b64);
 
                 $count = count($result['problems']);
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'ocr_done',
                     'ocr_result'   => json_encode($result, JSON_UNESCAPED_UNICODE),
@@ -72,7 +72,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 $problems = $result['problems'];
 
             } catch (\Throwable $e) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'requires_manual_review',
                     'error_msg'    => 'Stage2 OCR error: ' . $e->getMessage(),
@@ -200,7 +200,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             $generator = new \qbank_stackgen\api\feedback_generator();
             $feedback  = $generator->run($problems, $ragresults);
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                => $jobid,
                 'status'            => 'feedback_pending',
                 'feedback_result'   => json_encode($feedback, JSON_UNESCAPED_UNICODE),
@@ -210,7 +210,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             mtrace("[qbank_stackgen] Job {$jobid}: feedback draft generated, awaiting teacher review.");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'status'       => 'requires_manual_review',
                 'error_msg'    => 'Stage3 feedback error: ' . $e->getMessage(),
@@ -277,7 +277,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 $generator = new \qbank_stackgen\api\llm_generator();
                 $output    = $generator->run($problems, $feedbackproblems, $lasterror, $ragresults);
             } catch (\Throwable $e) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'requires_manual_review',
                     'error_msg'    => 'Stage4 LLM error: ' . $e->getMessage(),
@@ -292,7 +292,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             } catch (\Throwable $e) {
                 // goemaximaとの通信エラーはコンテンツの問題ではないインフラ障害なので、
                 // 再生成リトライはせず即座に手動レビューへ回す。
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'requires_manual_review',
                     'xml_result'   => $output['xml'],
@@ -305,7 +305,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             }
 
             if ($result['valid']) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'validated',
                     'xml_result'   => $output['xml'],
@@ -321,7 +321,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             }
 
             $lasterror = implode(' / ', $result['errors']);
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'status'       => 'validation_failed',
                 'xml_result'   => $output['xml'],
@@ -334,7 +334,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 . $lasterror);
         }
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'           => $jobid,
             'status'       => 'requires_manual_review',
             'error_msg'    => "Stage5 CAS validation failed after {$maxretry} attempts: {$lasterror}",
@@ -357,7 +357,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             // 承認済み（問題バンク登録完了）になったので、一時保存していた元画像は不要になる。
             // CLAUDE.md記載の方針「image_b64はDBに一時保存のみ。承認/却下後に削除する」に従い、
             // ここで確実に削除する（xml_result等の生成結果は評価データとして残す）。
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                    => $jobid,
                 'status'                => 'approved',
                 'question_ids'          => json_encode($result['questionids']),
@@ -370,7 +370,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 . count($result['questionids']) . " question(s)).");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'status'       => 'requires_manual_review',
                 'error_msg'    => 'Stage6 import error: ' . $e->getMessage(),
