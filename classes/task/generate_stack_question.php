@@ -35,7 +35,28 @@ class generate_stack_question extends \core\task\adhoc_task {
         return get_string('pluginname', 'qbank_stackgen');
     }
 
+    /**
+     * 実処理（execute_inner）の前後で、トークン使用量の記録先を設定し、タスクの開始・終了時刻を残す。
+     * 開始・終了の記録で、cronの順番待ちと実処理を実測で分けられる（cli/event_report.php）。
+     */
     public function execute(): void {
+        $data  = $this->get_custom_data();
+        $jobid = (int)($data->jobid ?? 0);
+        if ($jobid) {
+            \qbank_stackgen\api\gemini_http_client::set_usage_context($jobid, 'traditional');
+            \qbank_stackgen\local\event_log::log($jobid, 'traditional', 'task_start');
+        }
+        try {
+            $this->execute_inner();
+        } finally {
+            if ($jobid) {
+                \qbank_stackgen\local\event_log::log($jobid, 'traditional', 'task_end');
+            }
+            \qbank_stackgen\api\gemini_http_client::clear_usage_context();
+        }
+    }
+
+    private function execute_inner(): void {
         global $DB;
 
         $data  = $this->get_custom_data();
