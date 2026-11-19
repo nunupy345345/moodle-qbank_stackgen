@@ -53,6 +53,8 @@ class gemini_http_client {
             \qbank_stackgen\local\event_log::log(self::$usagejobid, self::$usagetrack, 'api_call', json_encode([
                 'ctx'      => $context,
                 'model'    => $m[1] ?? '',
+                // 実際に応答したモデル。指定したモデルが別のモデルに自動で振り替えられたとき（廃止予定モデルなど）に気づくため。
+                'modelver' => is_array($decoded) ? ($decoded['modelVersion'] ?? null) : null,
                 // embedContent の応答には usageMetadata が無いので、その場合は null（トークン数不明）のまま残す。
                 'in'       => $usage['promptTokenCount'] ?? null,
                 'out'      => $usage['candidatesTokenCount'] ?? null,

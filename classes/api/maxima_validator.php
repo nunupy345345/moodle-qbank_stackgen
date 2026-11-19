@@ -29,6 +29,15 @@ class maxima_validator {
 
     private const ERROR_MARKERS = ['syntax error', 'incorrect syntax', '-- an error.'];
 
+    /** KC診断版の条件のうち、扱いを error / warn / ignore から選べるもの（c1=旧①, c3=旧③, c6=旧⑥）。 */
+    private const KC_RELAXABLE_RULES = ['c1', 'c3', 'c6'];
+
+    /** 直近の validate_one（kc_chain）で、警告扱いにした違反: [['rule' => 'c1', 'msg' => '...'], ...] */
+    private array $kcwarnings = [];
+
+    /** 直近の validate_one（kc_chain）の、ノード×入力の判定結果。条件を緩めたときだけ計算する。 */
+    private ?array $kcmatrix = null;
+
     /**
      * @param string $xml  <quiz>...</quiz> 全体（llm_generator::run() の出力）
      * @return array{valid: bool, errors: string[]}
@@ -58,6 +67,8 @@ class maxima_validator {
      * @param int    $qnum  エラーメッセージに含める問題番号
      * @param array  $options  ['mode' => 'kc_chain', 'variants' => string[]] を渡すと、KC診断版（chain型）として
      *                         検証する。variants は KC診断ノードと同じ順序で並んだ「そのKCだけが欠けた答え」のMaxima式。
+     *                         'rules' => ['c1' => 'warn', ...] で、旧①(c1)・旧③(c3)・旧⑥(c6)の扱いを
+     *                         error（既定。違反は検証NG）/ warn（違反を警告として返し、通す）/ ignore（無視）から選べる。
      * @return array{valid: bool, errors: string[]}
      * @throws \moodle_exception goemaximaとの通信エラーのとき
      */
@@ -72,8 +83,15 @@ class maxima_validator {
             return ['valid' => false, 'errors' => ["問題{$qnum}: <question> 要素が見つかりません"]];
         }
 
+        $this->kcwarnings = [];
+        $this->kcmatrix = null;
         $errors = $this->validate_question($questions->item(0), $qnum, $options);
-        return ['valid' => empty($errors), 'errors' => $errors];
+        $result = ['valid' => empty($errors), 'errors' => $errors];
+        if (($options['mode'] ?? '') === 'kc_chain') {
+            $result['warnings'] = $this->kcwarnings;
+            $result['matrix'] = $this->kcmatrix;
+        }
+        return $result;
     }
 
     /**
@@ -118,7 +136,9 @@ class maxima_validator {
 
         // KC診断版（chain型）: ノードごとの判定式が、正答で真・「そのKCだけが欠けた答え」で偽になるかを確かめる。
         if (($options['mode'] ?? '') === 'kc_chain') {
-            return $this->validate_kc_chain($question, $qnum, $qvtext, $tavar, array_values((array)($options['variants'] ?? [])));
+            return $this->validate_kc_chain(
+                $question, $qnum, $qvtext, $tavar, array_values((array)($options['variants'] ?? [])),
+                (array)($options['rules'] ?? []));
         }
 
         // 誤答例変数名を抽出（正答以外の代入先。早期終了型/従来版・RAGなし版用）。
@@ -249,7 +269,7 @@ class maxima_validator {
      * @return string[] エラーメッセージ（なければ空配列）
      */
     private function validate_kc_chain(
-        \DOMElement $question, int $qnum, string $qvtext, string $tavar, array $variants
+        \DOMElement $question, int $qnum, string $qvtext, string $tavar, array $variants, array $rules = []
     ): array {
         $prts = $question->getElementsByTagName('prt');
         if ($prts->length === 0) {
@@ -286,7 +306,20 @@ class maxima_validator {
         // 不定積分はノード1が Int。学生は積分定数を付けて答えるので、正答側にも + C を付けて確かめる。
         $reference = $text($first, 'answertest') === 'Int' ? "({$tavar}+C)" : $tavar;
 
+        // 条件ごとの扱い。何も指定しなければ全部 error で、これまでと同じ動作になる。
+        $modes = [];
+        foreach (self::KC_RELAXABLE_RULES as $rule) {
+            $m = (string)($rules[$rule] ?? 'error');
+            $modes[$rule] = in_array($m, ['error', 'warn', 'ignore'], true) ? $m : 'error';
+        }
         $errors = [];
+        $flag = function (string $rule, string $msg) use (&$errors, $modes): void {
+            if ($modes[$rule] === 'error') {
+                $errors[] = $msg;
+            } else if ($modes[$rule] === 'warn') {
+                $this->kcwarnings[] = ['rule' => $rule, 'msg' => $msg];
+            }
+        };
         $truefound = false;
         $ansvalue = null;
         foreach ($kcnodes as $k => $node) {
@@ -305,11 +338,13 @@ class maxima_validator {
                 if ($ansvalue === null) {
                     $ansvalue = $this->kc_chain_answer_value($qvtext, $reference);
                 }
-                $errors[] = "問題{$qnum}: {$label}（判定式 {$sans} = {$tans}）が、正答では真になりません"
+                $flag('c1', "問題{$qnum}: {$label}（判定式 {$sans} = {$tans}）が、正答では真になりません"
                     . "（応答: " . ($refdetail !== '' ? $refdetail : $ref) . "）。正答を使えば真になる判定式にしてください"
                     . ($ansvalue !== '' ? "。ans1 に入れる正答 {$reference} をMaximaで評価した実際の値は {$ansvalue} です。"
-                        . "この形（展開された式など）で成り立つ判定式にすること" : '');
-                continue;
+                        . "この形（展開された式など）で成り立つ判定式にすること" : ''));
+                if ($modes['c1'] === 'error') {
+                    continue; // 警告・無視のときは、旧②・旧③の評価もこのノードで続ける
+                }
             }
 
             [$var, $vardetail] = $this->kc_chain_test($qvtext, $sans, $tans, '(' . $variants[$k] . ')');
@@ -338,16 +373,16 @@ class maxima_validator {
             }
         }
 
-        if (empty($errors) && count($kcnodes) >= 2 && !$truefound) {
-            $errors[] = "問題{$qnum}: どのKC診断ノードの判定式も、他のKCが欠けた答え（そのKCは使えている答え）では偽になります。"
+        if (count($kcnodes) >= 2 && !$truefound && ($modes['c3'] !== 'error' || empty($errors))) {
+            $flag('c3', "問題{$qnum}: どのKC診断ノードの判定式も、他のKCが欠けた答え（そのKCは使えている答え）では偽になります。"
                 . "これでは「答えが正答と一致するか」とほぼ同じで、どのKCが欠けたか診断できません。"
                 . "特に最初のKCノードは、他のKCの欠落に左右されない、そのKCだけの特徴"
-                . "（型A「特定の関数・部分式を含む」、型D「次数・係数」など）で判定してください";
+                . "（型A「特定の関数・部分式を含む」、型D「次数・係数」など）で判定してください");
         }
 
         // 条件6: 各KCの誤答（そのKCだけが欠けた答え）で、自分以外のKCノードが少なくとも1つ真になること。
         // 全ノードが偽になる答えは、どのKCが欠けたか特定できず診断として成立しない。
-        if (empty($errors) && count($kcnodes) >= 2) {
+        if (count($kcnodes) >= 2 && ($modes['c6'] !== 'error' || empty($errors))) {
             foreach ($variants as $k => $variant) {
                 $othertrue = 0;
                 foreach ($kcnodes as $j => $node) {
@@ -360,10 +395,10 @@ class maxima_validator {
                     }
                 }
                 if ($othertrue === 0) {
-                    $errors[] = "問題{$qnum}: 誤答 {$variant} では、そのKC以外の診断ノードがすべて偽になり、"
+                    $flag('c6', "問題{$qnum}: 誤答 {$variant} では、そのKC以外の診断ノードがすべて偽になり、"
                         . "どのKCが欠けたか特定できません。他のKCノードは「そのKC以外の特徴」だけを見る判定式にして、"
                         . "この誤答でも少なくとも1つは真になるようにしてください"
-                        . "（例: 型A「特定の関数・部分式を含む」、型D「次数・係数」は、答えが大きく崩れても影響を受けにくい）";
+                        . "（例: 型A「特定の関数・部分式を含む」、型D「次数・係数」は、答えが大きく崩れても影響を受けにくい）");
                 }
             }
         }
@@ -378,6 +413,21 @@ class maxima_validator {
             } else {
                 $seen[$key] = $k;
             }
+        }
+
+        // 条件を緩めたときは、後から「どの入力にも反応しないノード」などを数えられるように、
+        // ノード×入力（正答・各誤答）の判定結果を残す。既定（全部 error）のときは追加のCAS呼び出しをしない。
+        if (array_filter($modes, fn($m) => $m !== 'error')) {
+            $matrix = ['ref' => [], 'variants' => []];
+            foreach ($kcnodes as $k => $node) {
+                $sans = $text($node, 'sans');
+                $tans = $text($node, 'tans');
+                [$matrix['ref'][$k]] = $this->kc_chain_test($qvtext, $sans, $tans, $reference);
+                foreach ($variants as $j => $variant) {
+                    [$matrix['variants'][$k][$j]] = $this->kc_chain_test($qvtext, $sans, $tans, '(' . $variant . ')');
+                }
+            }
+            $this->kcmatrix = $matrix;
         }
 
         return $errors;
