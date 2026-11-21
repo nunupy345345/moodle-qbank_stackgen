@@ -1,6 +1,6 @@
 // AMD module: KC diagnosis (separate page, kc_review.php) Stage 3 review (wrong-answer/feedback editing).
 // Fully independent from amd/src/job_review.js (existing page).
-define(['core/notification'], function(Notification) {
+define(['core/notification', 'qbank_stackgen/review_timer'], function(Notification, ReviewTimer) {
 
     /**
      * Collects all wrong-answer rows for a given problem block into a plain object.
@@ -53,6 +53,7 @@ define(['core/notification'], function(Notification) {
         body.set('sesskey', sesskey);
         body.set('courseid', courseid);
         body.set('jobid', jobid);
+        body.set('activesec', ReviewTimer.seconds('kc', jobid));
         body.set('feedbackdata', JSON.stringify({problems: problems}));
 
         confirmBtn.disabled = true;
@@ -95,6 +96,7 @@ define(['core/notification'], function(Notification) {
      * Register the click handlers of the KC review panels.
      */
     function init() {
+        ReviewTimer.init();
         document.addEventListener('click', function(e) {
             var addBtn = e.target.closest('.stackgen-kc-wa-add');
             if (addBtn) {

@@ -26,7 +26,28 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
         return get_string('pluginname', 'qbank_stackgen') . ' (RAGなし比較)';
     }
 
+    /**
+     * 実処理（execute_inner）の前後で、トークン使用量の記録先を設定し、タスクの開始・終了時刻を残す。
+     * 開始・終了の記録で、cronの順番待ちと実処理を実測で分けられる（cli/event_report.php）。
+     */
     public function execute(): void {
+        $data  = $this->get_custom_data();
+        $jobid = (int)($data->jobid ?? 0);
+        if ($jobid) {
+            \qbank_stackgen\api\gemini_http_client::set_usage_context($jobid, 'norag');
+            \qbank_stackgen\local\event_log::log($jobid, 'norag', 'task_start');
+        }
+        try {
+            $this->execute_inner();
+        } finally {
+            if ($jobid) {
+                \qbank_stackgen\local\event_log::log($jobid, 'norag', 'task_end');
+            }
+            \qbank_stackgen\api\gemini_http_client::clear_usage_context();
+        }
+    }
+
+    private function execute_inner(): void {
         global $DB;
 
         $data  = $this->get_custom_data();
@@ -105,7 +126,7 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
             $generator = new \qbank_stackgen\api\feedback_generator();
             $feedback  = $generator->run($problems);
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                   => $jobid,
                 'norag_status'         => 'feedback_pending',
                 'norag_feedback_result' => json_encode($feedback, JSON_UNESCAPED_UNICODE),
@@ -114,7 +135,7 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
             mtrace("[qbank_stackgen] NoRAG Job {$jobid}: feedback draft generated (no RAG), awaiting teacher review.");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'            => $jobid,
                 'norag_status'  => 'requires_manual_review',
                 'norag_error_msg' => 'NoRAG Stage3 feedback error: ' . $e->getMessage(),
@@ -141,7 +162,7 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
                 $generator = new \qbank_stackgen\api\llm_generator();
                 $output    = $generator->run($problems, $feedbackproblems, $lasterror);
             } catch (\Throwable $e) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'              => $jobid,
                     'norag_status'    => 'requires_manual_review',
                     'norag_error_msg' => 'NoRAG Stage4 LLM error: ' . $e->getMessage(),
@@ -154,7 +175,7 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
             try {
                 $result = $validator->validate($output['xml']);
             } catch (\Throwable $e) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'               => $jobid,
                     'norag_status'     => 'requires_manual_review',
                     'norag_xml_result' => $output['xml'],
@@ -167,7 +188,7 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
             }
 
             if ($result['valid']) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'                => $jobid,
                     'norag_status'      => 'llm_done',
                     'norag_xml_result'  => $output['xml'],
@@ -183,7 +204,7 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
             }
 
             $lasterror = implode(' / ', $result['errors']);
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                => $jobid,
                 'norag_xml_result'  => $output['xml'],
                 'norag_llm_cot'     => $output['cot'],
@@ -195,7 +216,7 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
                 . $lasterror);
         }
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'              => $jobid,
             'norag_status'    => 'requires_manual_review',
             'norag_error_msg' => "NoRAG Stage5 CAS validation failed after {$maxretry} attempts: {$lasterror}",
@@ -220,7 +241,7 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
             ];
             $result = \qbank_stackgen\question_importer::import($importjob);
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                         => $jobid,
                 'norag_status'               => 'approved',
                 'norag_question_ids'         => json_encode($result['questionids']),
@@ -232,7 +253,7 @@ class generate_stack_question_norag extends \core\task\adhoc_task {
                 . count($result['questionids']) . " question(s)).");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'              => $jobid,
                 'norag_status'    => 'requires_manual_review',
                 'norag_error_msg' => 'NoRAG Stage6 import error: ' . $e->getMessage(),

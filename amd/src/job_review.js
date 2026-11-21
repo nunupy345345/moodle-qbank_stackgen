@@ -1,5 +1,5 @@
 // AMD module: inline Stage 3 review (wrong-answer/feedback editing) on upload.php's job list.
-define(['core/notification'], function(Notification) {
+define(['core/notification', 'qbank_stackgen/review_timer'], function(Notification, ReviewTimer) {
 
     /**
      * Collects all wrong-answer rows for a given problem block into a plain object.
@@ -71,6 +71,7 @@ define(['core/notification'], function(Notification) {
         body.set('sesskey', sesskey);
         body.set('courseid', courseid);
         body.set('jobid', jobid);
+        body.set('activesec', ReviewTimer.seconds('traditional', jobid));
         body.set('feedbackdata', JSON.stringify({problems: problems}));
 
         confirmBtn.disabled = true;
@@ -176,6 +177,7 @@ define(['core/notification'], function(Notification) {
         body.set('sesskey', sesskey);
         body.set('courseid', courseid);
         body.set('jobid', jobid);
+        body.set('activesec', ReviewTimer.seconds('norag', jobid));
         body.set('feedbackdata', JSON.stringify({problems: problems}));
 
         confirmBtn.disabled = true;
@@ -216,6 +218,7 @@ define(['core/notification'], function(Notification) {
      * Register the click handlers of the review panels.
      */
     function init() {
+        ReviewTimer.init();
         document.addEventListener('click', function(e) {
             var toggle = e.target.closest('.stackgen-review-toggle');
             if (toggle) {

@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ['id' => $jobid, 'courseid' => $courseid, 'userid' => $USER->id], '*', MUST_EXIST);
 
     if ($action === 'start') {
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'           => $jobid,
             'kc_status'    => '',
             'kc_error_msg' => null,
@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $resumestatus = '';
         }
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'             => $jobid,
             'kc_status'      => $resumestatus,
             'kc_error_msg'   => null,
@@ -114,7 +114,7 @@ $dbjobs = $DB->get_records_select(
     [$courseid, $USER->id],
     'id DESC',
     'id, courseid, ocr_result, track_kc, kc_status, kc_feedback_result, kc_feedback_confirmed, ' .
-        'kc_xml_result, kc_error_msg, kc_retry_count, kc_question_category_id',
+        'kc_xml_result, kc_error_msg, kc_retry_count, kc_question_ids, kc_question_category_id',
     0, 20
 );
 

@@ -221,7 +221,8 @@ class job_view {
 
         $isapproved = $job->status === 'approved';
         $bankurl = '';
-        if ($isapproved && !empty($job->question_category_id)) {
+        $bankexists = self::questions_exist($job->question_ids ?? null);
+        if ($isapproved && $bankexists && !empty($job->question_category_id)) {
             $bankurl = (new \moodle_url('/question/edit.php', [
                 'courseid' => $courseid,
                 'cat'      => $job->question_category_id . ',' . \context_course::instance($courseid)->id,
@@ -263,6 +264,7 @@ class job_view {
             'autoprocessing'     => $autoprocessing,
             'isapproved'         => $isapproved,
             'bankurl'            => $bankurl,
+            'bankexists'         => $bankexists,
             'confirmurl'         => (new \moodle_url('/question/bank/stackgen/review.php'))->out(false),
             'sesskey'            => $sesskey,
             'courseid'           => $courseid,
@@ -281,6 +283,22 @@ class job_view {
      * @param int $courseid
      * @return array
      */
+    /**
+     * ジョブが問題バンクに登録した問題が、まだ問題バンクに存在するか。
+     * （問題バンク側で削除されたあとは「問題バンクで確認」リンクを無効にするために使う）
+     *
+     * @param string|null $idsjson 登録済み問題IDのJSON配列
+     */
+    public static function questions_exist(?string $idsjson): bool {
+        global $DB;
+        $ids = array_filter(array_map('intval', json_decode($idsjson ?: '[]', true) ?: []));
+        if (empty($ids)) {
+            return false;
+        }
+        [$insql, $params] = $DB->get_in_or_equal($ids);
+        return $DB->record_exists_select('question', "id $insql", $params);
+    }
+
     private static function build_norag(\stdClass $job, int $courseid): array {
         $hasnorag = !empty($job->track_norag);
         $norag_status = $job->norag_status ?? '';
@@ -356,7 +374,8 @@ class job_view {
         }
 
         $bankurl = '';
-        if ($isapproved && !empty($job->norag_question_category_id)) {
+        $bankexists = self::questions_exist($job->norag_question_ids ?? null);
+        if ($isapproved && $bankexists && !empty($job->norag_question_category_id)) {
             $bankurl = (new \moodle_url('/question/edit.php', [
                 'courseid' => $courseid,
                 'cat'      => $job->norag_question_category_id . ',' . \context_course::instance($courseid)->id,
@@ -383,6 +402,7 @@ class job_view {
             'norag_error_msg'         => $job->norag_error_msg ?? '',
             'norag_isapproved'        => $isapproved,
             'norag_bankurl'           => $bankurl,
+            'norag_bankexists'        => $bankexists,
             'norag_confirmurl'        => (new \moodle_url('/question/bank/stackgen/norag_review_confirm.php'))->out(false),
             'norag_polling'           => $processing || $awaitingxml,
         ];

@@ -20,6 +20,7 @@
         <FIELD NAME="question_category_id"   TYPE="int"  LENGTH="10" NOTNULL="false" COMMENT="Stage6の登録先question_categories.id"/>
         <FIELD NAME="retry_count"  TYPE="int"  LENGTH="2"  NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="rag_examples_used" TYPE="text" NOTNULL="false" COMMENT="RAG検索でヒットしたqbank_stackgen_examples.idと類似度のJSON配列(トレーサビリティ・効果測定用)"/>
+        <FIELD NAME="rag_exclude" TYPE="text" NOTNULL="false" COMMENT="RAG検索から除外するqbank_stackgen_examples.sourcefileのJSON配列(アンケート用のleave-one-out生成で使用。通常はNULL)"/>
         <FIELD NAME="sourcefilename" TYPE="char" LENGTH="255" NOTNULL="false" COMMENT="cli/bulk_import.phpでフォルダから一括投入した場合の元ファイル名(重複投入防止用。ブラウザアップロード分はNULL)"/>
         <FIELD NAME="kc_status"                TYPE="char" LENGTH="30" NOTNULL="true" DEFAULT="" COMMENT="KC診断版(別ページ)の進捗。空=未着手"/>
         <FIELD NAME="kc_feedback_result"        TYPE="text" NOTNULL="false" COMMENT="KC診断版Stage3: AI生成の誤答例(KC起点)のJSON"/>
@@ -60,6 +61,7 @@
         <FIELD NAME="id"          TYPE="int"  LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="sourcefile"  TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="fixtures/prt/questions配下の元ファイル名"/>
         <FIELD NAME="category"    TYPE="char" LENGTH="60"  NOTNULL="false" COMMENT="integral/derivative等(index.json由来)"/>
+        <FIELD NAME="expression" TYPE="text" NOTNULL="false" COMMENT="問題の式(questionvariablesのexpr/ex、Maxima記法)。qtextと合わせて埋め込み、検索の手がかりにする"/>
         <FIELD NAME="qtext"       TYPE="text" NOTNULL="true" COMMENT="埋め込み対象の問題文(qtext)"/>
         <FIELD NAME="score"       TYPE="int"  LENGTH="5"  NOTNULL="false" COMMENT="build_fixtures.pyによるPRT作り込み度スコア"/>
         <FIELD NAME="n_nodes"     TYPE="int"  LENGTH="5"  NOTNULL="false" COMMENT="PRTノード数(index.json由来、Stage4 Few-shot用)"/>
@@ -73,6 +75,22 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="sourcefile_idx" UNIQUE="true" FIELDS="sourcefile"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="qbank_stackgen_events" COMMENT="所要時間の計測用イベントログ（ジョブ・版ごとの状態遷移、確認画面の作業時間など）">
+      <FIELDS>
+        <FIELD NAME="id"        TYPE="int"    LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="jobid"     TYPE="int"    LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="track"     TYPE="char"   LENGTH="20" NOTNULL="true" DEFAULT="" COMMENT="traditional / norag / kc。版に依らないイベントは空"/>
+        <FIELD NAME="event"     TYPE="char"   LENGTH="40" NOTNULL="true" COMMENT="created / status / retry / confirmed / review_open / review_active"/>
+        <FIELD NAME="detail"    TYPE="char"   LENGTH="255" NOTNULL="false" COMMENT="status=新しい状態、retry=回数、review_active=操作していた秒数"/>
+        <FIELD NAME="eventtime" TYPE="number" LENGTH="16" DECIMALS="3" NOTNULL="true" COMMENT="UNIX時刻（ミリ秒精度）"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="jobid_idx" UNIQUE="false" FIELDS="jobid"/>
       </INDEXES>
     </TABLE>
   </TABLES>

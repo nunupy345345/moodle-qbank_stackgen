@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $resumestatus = 'pending';
         }
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'           => $jobid,
             'status'       => $resumestatus,
             'error_msg'    => null,
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $resumestatus = '';
         }
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'                => $jobid,
             'norag_status'      => $resumestatus,
             'norag_error_msg'   => null,
@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $job = $DB->get_record('qbank_stackgen_jobs',
             ['id' => $jobid, 'courseid' => $courseid, 'userid' => $USER->id], '*', MUST_EXIST);
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'                 => $jobid,
             'status'             => 'feedback_pending',
             'feedback_confirmed' => null,
@@ -180,6 +180,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'timecreated'       => $now,
         'timemodified'      => $now,
     ]);
+
+    \qbank_stackgen\local\event_log::log((int)$jobid, '', 'created', $sourcefilename);
 
     // Queue Adhoc Task.
     $task = new \qbank_stackgen\task\generate_stack_question();
@@ -266,9 +268,9 @@ $dbjobs = $DB->get_records_select(
     $params,
     'id DESC',
     'id, status, ocr_result, feedback_result, feedback_confirmed, xml_result, error_msg, ' .
-        'question_category_id, retry_count, timecreated, rag_examples_used, ' .
+        'question_ids, question_category_id, retry_count, timecreated, rag_examples_used, ' .
         'track_norag, norag_status, norag_feedback_result, norag_feedback_confirmed, ' .
-        'norag_xml_result, norag_error_msg, norag_retry_count, norag_question_category_id',
+        'norag_xml_result, norag_error_msg, norag_retry_count, norag_question_ids, norag_question_category_id',
     $limitfrom, $limitnum
 );
 

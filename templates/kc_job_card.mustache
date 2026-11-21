@@ -195,9 +195,17 @@
         {{/ haserror }}
 
         {{# isapproved }}
+        {{# bankexists }}
         <a href="{{bankurl}}" class="btn btn-outline-primary btn-sm">
             {{# str }} import_view_bank, qbank_stackgen {{/ str }}
         </a>
+        {{/ bankexists }}
+        {{^ bankexists }}
+        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+            {{# str }} import_view_bank, qbank_stackgen {{/ str }}
+        </button>
+        <span class="small text-muted ml-2">{{# str }} import_bank_deleted, qbank_stackgen {{/ str }}</span>
+        {{/ bankexists }}
         {{/ isapproved }}
     </div>
 </div>

@@ -25,7 +25,83 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
         return get_string('pluginname', 'qbank_stackgen') . ' (KC)';
     }
 
+    /**
+     * 実処理（execute_inner）の前後で、トークン使用量の記録先を設定し、タスクの開始・終了時刻を残す。
+     * 開始・終了の記録で、cronの順番待ちと実処理を実測で分けられる（cli/event_report.php）。
+     */
     public function execute(): void {
+        $data  = $this->get_custom_data();
+        $jobid = (int)($data->jobid ?? 0);
+        if ($jobid) {
+            \qbank_stackgen\api\gemini_http_client::set_usage_context($jobid, 'kc');
+            \qbank_stackgen\local\event_log::log($jobid, 'kc', 'task_start');
+            $profile = $this->rules_from_custom_data();
+            if ($profile) {
+                // この実行で、どの検証条件の扱いにしたか（再検証実験用。何も指定しなければ記録しない）。
+                \qbank_stackgen\local\event_log::log($jobid, 'kc', 'kc_profile', json_encode(
+                    ['label' => (string)($data->kc_profile ?? '')] + $profile, JSON_UNESCAPED_UNICODE));
+            }
+        }
+        try {
+            $this->execute_inner();
+        } finally {
+            if ($jobid) {
+                \qbank_stackgen\local\event_log::log($jobid, 'kc', 'task_end');
+            }
+            \qbank_stackgen\api\gemini_http_client::clear_usage_context();
+        }
+    }
+
+    /**
+     * カスタムデータの kc_rules（['c1' => 'warn', ...]）を返す。指定がなければ空配列＝これまでと同じ動作。
+     * ジョブごとに渡すので、同時に動く他のKCジョブの検証には影響しない。
+     */
+    private function rules_from_custom_data(): array {
+        $data = $this->get_custom_data();
+        $rules = (array)($data->kc_rules ?? []);
+        return array_filter($rules, fn($v) => in_array($v, ['error', 'warn', 'ignore'], true));
+    }
+
+    /**
+     * 緩めた条件で検証したときの結果を、1回の検証ごとに kc_check イベントとして残す（events.detail は255文字まで）。
+     * w=警告にした違反の条件、ok=この問題が検証を通ったか、ref/m=ノードごとの判定結果（T/F/E）、
+     * inert=どの入力（正答・各誤答）でも真にならないノード番号。
+     */
+    private function log_kc_check(int $jobid, int $qnum, int $attempt, array $result): void {
+        try {
+            $abbr = fn($r) => $r === 'true' ? 'T' : ($r === 'false' ? 'F' : 'E');
+            $detail = [
+                'q'  => $qnum,
+                'a'  => $attempt,
+                'ok' => $result['valid'] ? 1 : 0,
+                'w'  => array_values(array_unique(array_column($result['warnings'] ?? [], 'rule'))),
+            ];
+            $matrix = $result['matrix'] ?? null;
+            if ($matrix) {
+                $inert = [];
+                $rows = [];
+                foreach ($matrix['ref'] as $k => $ref) {
+                    $row = implode('', array_map($abbr, $matrix['variants'][$k] ?? []));
+                    $rows[] = $abbr($ref) . ':' . $row;
+                    if ($ref !== 'true' && strpos($row, 'T') === false) {
+                        $inert[] = $k + 1;
+                    }
+                }
+                $detail['inert'] = $inert;
+                $detail['m'] = implode('/', $rows); // ノードごとに「正答:誤答1誤答2…」
+            }
+            $json = json_encode($detail, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if (strlen($json) > 255) {
+                unset($detail['m']);
+                $json = json_encode($detail, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            \qbank_stackgen\local\event_log::log($jobid, 'kc', 'kc_check', $json);
+        } catch (\Throwable $e) {
+            debugging('qbank_stackgen: kc_check logging failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+    }
+
+    private function execute_inner(): void {
         global $DB;
 
         $data  = $this->get_custom_data();
@@ -82,7 +158,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             // （KC診断版のためだけに追加の埋め込みAPI呼び出しは行わない）。
             $ragresults = json_decode($job->rag_examples_used ?? '', true) ?: [];
 
-            $this->run_xml_stage($jobid, $problems, $feedbackproblems, $ragresults);
+            $this->run_xml_stage($jobid, $problems, $feedbackproblems, $ragresults, $this->rules_from_custom_data());
             return;
         }
 
@@ -114,7 +190,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             $generator = new \qbank_stackgen\api\kc_feedback_generator();
             $feedback  = $generator->run($problems, $ragresults);
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                => $jobid,
                 'kc_status'         => 'feedback_pending',
                 'kc_feedback_result' => json_encode($feedback, JSON_UNESCAPED_UNICODE),
@@ -123,7 +199,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             mtrace("[qbank_stackgen] KC Job {$jobid}: KC feedback draft generated, awaiting teacher review.");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'kc_status'    => 'requires_manual_review',
                 'kc_error_msg' => 'KC Stage3 feedback error: ' . $e->getMessage(),
@@ -137,13 +213,15 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
      * Stage 4〜5: 確定済みのKC起点誤答例を組み込んで STACK XML（PRT付き）を生成し、
      * CAS検証（goemaxima）に通す。既存の llm_generator / maxima_validator をそのまま再利用する。
      */
-    private function run_xml_stage(int $jobid, array $problems, array $feedbackproblems, array $ragresults = []): void {
+    private function run_xml_stage(
+        int $jobid, array $problems, array $feedbackproblems, array $ragresults = [], array $rules = []
+    ): void {
         global $DB;
 
         $maxretry = max(1, (int)(get_config('qbank_stackgen', 'max_retry') ?: 3));
         $apikey   = get_config('qbank_stackgen', 'google_api_key');
         if (empty($apikey)) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'kc_status'    => 'requires_manual_review',
                 'kc_error_msg' => 'KC Stage4 LLM error: google_api_key が設定されていません',
@@ -193,7 +271,17 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
                     continue;
                 }
                 try {
-                    $result = $validator->validate_one($debugxml[$i], $i + 1);
+                    // chain型: 誤答例（KCごとに「そのKCだけが欠けた答え」）を、判定式の検証に使う。
+                    $variants = array_map(
+                        fn($w) => (string)($w['expression'] ?? ''), $feedbackproblems[$i]['wronganswers'] ?? []);
+                    $vopts = ['mode' => 'kc_chain', 'variants' => $variants];
+                    if ($rules) {
+                        $vopts['rules'] = $rules;
+                    }
+                    $result = $validator->validate_one($debugxml[$i], $i + 1, $vopts);
+                    if ($rules) {
+                        $this->log_kc_check($jobid, $i + 1, $attempt, $result);
+                    }
                 } catch (\Throwable $e) {
                     $laststage = 'Stage5 CAS validator error';
                     $lasterror = "問題" . ($i + 1) . ": " . $e->getMessage();
@@ -211,7 +299,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
                 $newpending[] = $i;
             }
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'             => $jobid,
                 'kc_xml_result'  => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<quiz>\n"
                     . implode("\n\n", array_filter(array_map(
@@ -225,7 +313,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             ]);
 
             if (empty($newpending)) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'             => $jobid,
                     'kc_status'      => 'llm_done',
                     'timemodified'   => time(),
@@ -241,7 +329,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             $pending = $newpending;
         }
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'           => $jobid,
             'kc_status'    => 'requires_manual_review',
             'kc_error_msg' => "KC {$laststage} after {$maxretry} attempts (未解決" . count($pending) . "/{$count}問): {$lasterror}",
@@ -267,7 +355,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
             $result = \qbank_stackgen\question_importer::import(
                 $importjob, \qbank_stackgen\question_importer::CATEGORY_MARKER_KC);
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                       => $jobid,
                 'kc_status'                => 'approved',
                 'kc_question_ids'          => json_encode($result['questionids']),
@@ -279,7 +367,7 @@ class generate_stack_question_kc extends \core\task\adhoc_task {
                 . count($result['questionids']) . " question(s)).");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'kc_status'    => 'requires_manual_review',
                 'kc_error_msg' => 'KC Stage6 import error: ' . $e->getMessage(),

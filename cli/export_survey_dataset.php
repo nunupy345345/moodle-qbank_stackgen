@@ -3,6 +3,10 @@
  * 3トラック（従来版/RAGなし版/KC診断版）がすべて承認済みのジョブを対象に、
  * アンケート用データセットを1本のJSONとしてエクスポートするCLIスクリプト。
  *
+ * アンケート用ジョブ(cli/survey_seed.php で登録したもの)には、同じ問題の人間版(同梱コーパスの
+ * 教員手作りPRT。cli/survey_import_human.php で問題バンクに取り込み済みのもの)も
+ * tracks.human として同じ形式で添える。
+ *
  * このプラグイン自体はアンケートWebページを持たない（別プロジェクトで構築する）。
  * ここでの役割は、同一の元問題（qbank_stackgen_jobs 1レコード = 1画像、ocr_result.problems
  * の配列インデックスで3トラック間が対応する）に対する3バリアントの生成結果を、
@@ -189,6 +193,53 @@ function qbank_stackgen_parse_question_defs(?string $quizxml, int $index): array
 }
 
 /**
+ * 問題バンクに登録されている問題そのものからPRTを取り出す。ジョブのXMLは生成時点のもので、
+ * 登録後に問題バンク側で直された内容（判定式の修正など）を反映しないため、こちらを優先する。
+ *
+ * @return array|null PRTが無ければ null
+ */
+function qbank_stackgen_prt_from_questiondata(stdClass $questiondata): ?array {
+    if (empty($questiondata->prts)) {
+        return null;
+    }
+    $prt = reset($questiondata->prts);
+    $nodes = $prt->nodes ?? [];
+    uasort($nodes, fn($a, $b) => (int)$a->nodename <=> (int)$b->nodename);
+
+    $out = [];
+    foreach ($nodes as $n) {
+        $out[] = [
+            'name'        => (string)$n->nodename,
+            'description' => (string)($n->description ?? ''),
+            'answertest'  => (string)$n->answertest,
+            'sans'        => (string)$n->sans,
+            'tans'        => (string)$n->tans,
+            'testoptions' => (string)$n->testoptions,
+            'true' => [
+                'scoremode'  => (string)$n->truescoremode,
+                'score'      => (string)(float)$n->truescore,
+                'nextnode'   => (string)$n->truenextnode,
+                'answernote' => (string)$n->trueanswernote,
+                'feedback'   => (string)$n->truefeedback,
+            ],
+            'false' => [
+                'scoremode'  => (string)$n->falsescoremode,
+                'score'      => (string)(float)$n->falsescore,
+                'nextnode'   => (string)$n->falsenextnode,
+                'answernote' => (string)$n->falseanswernote,
+                'feedback'   => (string)$n->falsefeedback,
+            ],
+        ];
+    }
+
+    return [
+        'firstnodename'     => (string)$prt->firstnodename,
+        'feedbackvariables' => (string)($prt->feedbackvariables ?? ''),
+        'nodes'             => $out,
+    ];
+}
+
+/**
  * question_idの配列から、1トラック分の表示用データを作る。
  *
  * @return array|null $index番目の問題が存在しなければnull（トラック間で配列長が
@@ -231,8 +282,57 @@ function qbank_stackgen_survey_track_item(
         'preview_url'       => $previewurl,
         'questionvariables' => $defs['questionvariables'],
         'inputs'            => $defs['inputs'],
-        'prt'               => qbank_stackgen_parse_prt($trackxml, $index),
+        'prt'               => qbank_stackgen_prt_from_questiondata($questiondata)
+                               ?? qbank_stackgen_parse_prt($trackxml, $index),
     ];
+}
+
+/**
+ * アンケート用の人間版(cli/survey_import_human.php で問題バンクに取り込んだ教員手作りPRT)を、
+ * 生成3版と同じ形式の1トラック分データにする。元ファイルとの対応は
+ * question_bank_entries.idnumber(=ファイル名)で引く。
+ *
+ * @return array|null 取り込まれていない・読めない場合は null
+ */
+function qbank_stackgen_survey_human_item(int $courseid, string $sourcefile): ?array {
+    global $DB;
+
+    $context = context_course::instance($courseid);
+    $qid = $DB->get_field_sql(
+        'SELECT qv.questionid
+           FROM {question_bank_entries} qbe
+           JOIN {question_versions} qv ON qv.questionbankentryid = qbe.id
+           JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
+          WHERE qc.contextid = :ctx AND qc.idnumber = :marker AND qbe.idnumber = :idn
+       ORDER BY qv.version DESC',
+        ['ctx' => $context->id, 'marker' => \qbank_stackgen\question_importer::CATEGORY_MARKER_HUMAN,
+         'idn' => basename($sourcefile)],
+        IGNORE_MULTIPLE
+    );
+    if (!$qid) {
+        return null;
+    }
+
+    $path = \qbank_stackgen\local\corpus_importer::BUNDLED_DIR . '/' . basename($sourcefile);
+    $quizxml = is_readable($path) ? file_get_contents($path) : null;
+
+    $item = qbank_stackgen_survey_track_item([(int)$qid], 0, $context, $quizxml);
+    if ($item === null) {
+        return null;
+    }
+
+    // 人間版の問題文は {@expr@} を含む。生成3版は展開済みなので、STACKに実際に展開させた
+    // 問題文(CAS評価後のLaTeX)を questiontext とし、元の文字列は questiontext_raw に残す。
+    $item['questiontext_raw'] = $item['questiontext'];
+    try {
+        $question = question_bank::load_question((int)$qid);
+        $question->start_attempt(new question_attempt_step(), 1);
+        $item['questiontext'] = $question->questiontextinstantiated->get_rendered();
+    } catch (\Throwable $e) {
+        echo "  [warn] 人間版 {$sourcefile} の問題文を展開できませんでした（rawのまま）: " . $e->getMessage() . "\n";
+    }
+    $item['source_file'] = basename($sourcefile);
+    return $item;
 }
 
 function qbank_stackgen_export_survey_job(stdClass $job): array {
@@ -258,6 +358,15 @@ function qbank_stackgen_export_survey_job(stdClass $job): array {
             continue;
         }
 
+        // アンケート用ジョブ(survey_seed.php で登録したもの)なら、同じ問題の人間版も tracks.human に添える。
+        $human = null;
+        if (!empty($job->sourcefilename) && isset($GLOBALS['qbank_stackgen_survey_items'][$job->sourcefilename])) {
+            $human = qbank_stackgen_survey_human_item((int)$job->courseid, $job->sourcefilename);
+            if ($human === null) {
+                echo "  [job {$job->id}] 人間版が問題バンクにありません（先に survey_import_human.php を実行）。\n";
+            }
+        }
+
         $items[] = [
             'job_id'               => (int)$job->id,
             'problem_index'        => $i,
@@ -272,11 +381,20 @@ function qbank_stackgen_export_survey_job(stdClass $job): array {
                 'traditional' => $traditional,
                 'norag'       => $norag,
                 'kc'          => $kc,
-            ],
+            ] + ($human !== null ? ['human' => $human] : []),
         ];
     }
 
     return $items;
+}
+
+// アンケート用の人間版を添える対象（sourcefile の集合）。items.json が無ければ空。
+$GLOBALS['qbank_stackgen_survey_items'] = [];
+$surveyitemsfile = __DIR__ . '/../data/survey/items.json';
+if (is_readable($surveyitemsfile)) {
+    foreach ((json_decode((string)file_get_contents($surveyitemsfile), true)['items'] ?? []) as $it) {
+        $GLOBALS['qbank_stackgen_survey_items'][$it['sourcefile']] = true;
+    }
 }
 
 $conditions = [

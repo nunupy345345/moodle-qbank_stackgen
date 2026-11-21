@@ -55,7 +55,7 @@ foreach ($jobids as $jobid) {
         $resumestatus = '';
     }
 
-    $DB->update_record('qbank_stackgen_jobs', (object)[
+    \qbank_stackgen\local\event_log::update_job((object)[
         'id'             => $jobid,
         'kc_status'      => $resumestatus,
         'kc_error_msg'   => null,

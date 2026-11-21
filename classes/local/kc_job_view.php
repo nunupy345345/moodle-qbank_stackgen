@@ -141,7 +141,8 @@ class kc_job_view {
         }
 
         $bankurl = '';
-        if ($isapproved && !empty($job->kc_question_category_id)) {
+        $bankexists = job_view::questions_exist($job->kc_question_ids ?? null);
+        if ($isapproved && $bankexists && !empty($job->kc_question_category_id)) {
             $bankurl = (new \moodle_url('/question/edit.php', [
                 'courseid' => $courseid,
                 'cat'      => $job->kc_question_category_id . ',' . \context_course::instance($courseid)->id,
@@ -189,6 +190,7 @@ class kc_job_view {
             'error_msg'      => $job->kc_error_msg ?? '',
             'isapproved'     => $isapproved,
             'bankurl'        => $bankurl,
+            'bankexists'     => $bankexists,
             'confirmurl'     => (new \moodle_url('/question/bank/stackgen/kc_review_confirm.php'))->out(false),
             'startactionurl' => (new \moodle_url('/question/bank/stackgen/kc_review.php'))->out(false),
             'sesskey'        => $sesskey,

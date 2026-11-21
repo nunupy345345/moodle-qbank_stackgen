@@ -6,3 +6,7 @@ cli/survey_dataset_export/
 text_img/
 
 node_modules/
+
+# 実験の出力(結果データ。pushしない)
+cli/output
+cli/*.csv

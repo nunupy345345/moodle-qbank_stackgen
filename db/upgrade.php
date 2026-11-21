@@ -212,5 +212,52 @@ function xmldb_qbank_stackgen_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026100600, 'qbank', 'stackgen');
     }
 
+    if ($oldversion < 2026102200) {
+        $table = new xmldb_table('qbank_stackgen_jobs');
+
+        $field = new xmldb_field('rag_exclude', XMLDB_TYPE_TEXT, null, null, null, null, null, 'rag_examples_used');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_plugin_savepoint(true, 2026102200, 'qbank', 'stackgen');
+    }
+
+    if ($oldversion < 2026102201) {
+        $table = new xmldb_table('qbank_stackgen_examples');
+
+        $field = new xmldb_field('expression', XMLDB_TYPE_TEXT, null, null, null, null, null, 'category');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // 埋め込み対象が「問題文のみ」から「問題文＋式」に変わったため、同梱コーパスの行は
+        // 古い埋め込みのまま使えない。削除しておくと、次のRAG検索時に自動で再取り込みされる
+        // （同梱外のコーパスを cli/import_corpus.php で追加していた場合は --force で再計算すること）。
+        $bundled = array_map('basename', glob(\qbank_stackgen\local\corpus_importer::BUNDLED_DIR . '/*.xml') ?: []);
+        if ($bundled) {
+            $DB->delete_records_list('qbank_stackgen_examples', 'sourcefile', $bundled);
+        }
+
+        upgrade_plugin_savepoint(true, 2026102201, 'qbank', 'stackgen');
+    }
+
+    if ($oldversion < 2026110101) {
+        // 所要時間の計測用イベントログ表。
+        $table = new xmldb_table('qbank_stackgen_events');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('jobid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('track', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, '');
+        $table->add_field('event', XMLDB_TYPE_CHAR, '40', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('detail', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+        $table->add_field('eventtime', XMLDB_TYPE_NUMBER, '16, 3', null, XMLDB_NOTNULL, null, null);
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_index('jobid_idx', XMLDB_INDEX_NOTUNIQUE, ['jobid']);
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+        upgrade_plugin_savepoint(true, 2026110101, 'qbank', 'stackgen');
+    }
+
     return true;
 }

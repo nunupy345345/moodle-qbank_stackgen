@@ -1,0 +1,116 @@
+{
+  "items": [
+    {
+      "sourcefile": "01_derivative_(2-x^2)^3の微分.xml",
+      "technique": "べき・合成",
+      "question_type": "derivative",
+      "question_text": "次の関数を\\(x\\)で微分せよ。\\[ (2-x^2)^3 \\]",
+      "problem_expression": "(2-x^2)^3"
+    },
+    {
+      "sourcefile": "04_derivative_(x+1)log(x+1)の微分.xml",
+      "technique": "積の微分",
+      "question_type": "derivative",
+      "question_text": "次の関数を\\(x\\)で微分せよ。\\[ (x+1)\\log(x+1) \\]",
+      "problem_expression": "(x+1)\\log(x+1)"
+    },
+    {
+      "sourcefile": "09_derivative_2x-1-3x+4の微分.xml",
+      "technique": "商の微分",
+      "question_type": "derivative",
+      "question_text": "次の関数を\\(x\\)で微分せよ。\\[ \\frac{2x-1}{3x+4} \\]",
+      "problem_expression": "\\frac{2x-1}{3x+4}"
+    },
+    {
+      "sourcefile": "12_derivative_ln(abs(sin(x)))の微分.xml",
+      "technique": "対数×三角の合成",
+      "question_type": "derivative",
+      "question_text": "次の関数を\\(x\\)で微分せよ。\\[ \\ln|\\sin x| \\]",
+      "problem_expression": "\\ln|\\sin x|"
+    },
+    {
+      "sourcefile": "16_derivative_sin(x^2+1)の微分.xml",
+      "technique": "三角×合成",
+      "question_type": "derivative",
+      "question_text": "次の関数を\\(x\\)で微分せよ。\\[ \\sin(x^2+1) \\]",
+      "problem_expression": "\\sin(x^2+1)"
+    },
+    {
+      "sourcefile": "20_derivative_xe^{-x^2}の微分.xml",
+      "technique": "積×指数合成",
+      "question_type": "derivative",
+      "question_text": "次の関数を\\(x\\)で微分せよ。\\[ x e^{-x^2} \\]",
+      "problem_expression": "x e^{-x^2}"
+    },
+    {
+      "sourcefile": "14_derivative_log(cosh(x))の微分.xml",
+      "technique": "双曲関数",
+      "question_type": "derivative",
+      "question_text": "次の関数を\\(x\\)で微分せよ。\\[ \\log(\\cosh x) \\]",
+      "problem_expression": "\\log(\\cosh x)"
+    },
+    {
+      "sourcefile": "03_integral_(3x+2)^4の積分.xml",
+      "technique": "一次式の置換",
+      "question_type": "integral",
+      "question_text": "次の不定積分を求めよ。任意定数を忘れないこと。\\[ \\int (3x+2)^4 \\,\\mathrm{d}x \\]",
+      "problem_expression": "(3x+2)^4"
+    },
+    {
+      "sourcefile": "15_integral_sin(x)^2の積分.xml",
+      "technique": "半角公式",
+      "question_type": "integral",
+      "question_text": "次の不定積分を求めよ。任意定数を忘れないこと。\\[ \\int \\sin^2 x \\,\\mathrm{d}x \\]",
+      "problem_expression": "\\sin^2 x"
+    },
+    {
+      "sourcefile": "19_integral_x-sin(x)の積分.xml",
+      "technique": "部分積分",
+      "question_type": "integral",
+      "question_text": "次の不定積分を求めよ。任意定数を忘れないこと。\\[ \\int x\\sin x \\,\\mathrm{d}x \\]",
+      "problem_expression": "x\\sin x"
+    },
+    {
+      "sourcefile": "21_integral_x^2-e^-xの積分.xml",
+      "technique": "部分積分(2回)",
+      "question_type": "integral",
+      "question_text": "次の不定積分を求めよ。任意定数を忘れないこと。\\[ \\int x^2 e^{-x} \\,\\mathrm{d}x \\]",
+      "problem_expression": "x^2 e^{-x}"
+    },
+    {
+      "sourcefile": "02_integral_(2x+7)-(x^2+x-2)の積分.xml",
+      "technique": "部分分数",
+      "question_type": "integral",
+      "question_text": "次の不定積分を求めよ。任意定数を忘れないこと。\\[ \\int \\frac{2x+7}{x^2+x-2} \\,\\mathrm{d}x \\]",
+      "problem_expression": "\\frac{2x+7}{x^2+x-2}"
+    },
+    {
+      "sourcefile": "06_integral_1-(x^2-4x+29)の積分.xml",
+      "technique": "平方完成・arctan型",
+      "question_type": "integral",
+      "question_text": "次の不定積分を求めよ。任意定数を忘れないこと。\\[ \\int \\frac{1}{x^2-4x+29} \\,\\mathrm{d}x \\]",
+      "problem_expression": "\\frac{1}{x^2-4x+29}"
+    },
+    {
+      "sourcefile": "24_integral_積分 x-sqrt(2x+1).xml",
+      "technique": "無理関数の置換",
+      "question_type": "integral",
+      "question_text": "次の不定積分を求めよ。任意定数を忘れないこと。\\[ \\int \\frac{x}{\\sqrt{2x+1}} \\,\\mathrm{d}x \\]",
+      "problem_expression": "\\frac{x}{\\sqrt{2x+1}}"
+    },
+    {
+      "sourcefile": "26_integral_積分 x^3sqrt(x^2+1).xml",
+      "technique": "置換積分",
+      "question_type": "integral",
+      "question_text": "次の不定積分を求めよ。任意定数を忘れないこと。\\[ \\int x^3\\sqrt{x^2+1} \\,\\mathrm{d}x \\]",
+      "problem_expression": "x^3\\sqrt{x^2+1}"
+    },
+    {
+      "sourcefile": "10_integral_cos(2-x-3)の定積分.xml",
+      "technique": "定積分",
+      "question_type": "integral",
+      "question_text": "次の定積分を計算せよ。\\[ \\int_{0}^{2} \\cos\\left(\\frac{2}{3}x\\right) \\mathrm{d}x \\]",
+      "problem_expression": "\\cos\\left(\\frac{2}{3}x\\right)"
+    }
+  ]
+}

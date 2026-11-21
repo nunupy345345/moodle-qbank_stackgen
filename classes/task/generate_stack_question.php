@@ -35,7 +35,28 @@ class generate_stack_question extends \core\task\adhoc_task {
         return get_string('pluginname', 'qbank_stackgen');
     }
 
+    /**
+     * 実処理（execute_inner）の前後で、トークン使用量の記録先を設定し、タスクの開始・終了時刻を残す。
+     * 開始・終了の記録で、cronの順番待ちと実処理を実測で分けられる（cli/event_report.php）。
+     */
     public function execute(): void {
+        $data  = $this->get_custom_data();
+        $jobid = (int)($data->jobid ?? 0);
+        if ($jobid) {
+            \qbank_stackgen\api\gemini_http_client::set_usage_context($jobid, 'traditional');
+            \qbank_stackgen\local\event_log::log($jobid, 'traditional', 'task_start');
+        }
+        try {
+            $this->execute_inner();
+        } finally {
+            if ($jobid) {
+                \qbank_stackgen\local\event_log::log($jobid, 'traditional', 'task_end');
+            }
+            \qbank_stackgen\api\gemini_http_client::clear_usage_context();
+        }
+    }
+
+    private function execute_inner(): void {
         global $DB;
 
         $data  = $this->get_custom_data();
@@ -61,7 +82,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 $result = $ocr->run($job->image_b64);
 
                 $count = count($result['problems']);
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'ocr_done',
                     'ocr_result'   => json_encode($result, JSON_UNESCAPED_UNICODE),
@@ -72,7 +93,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 $problems = $result['problems'];
 
             } catch (\Throwable $e) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'requires_manual_review',
                     'error_msg'    => 'Stage2 OCR error: ' . $e->getMessage(),
@@ -200,7 +221,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             $generator = new \qbank_stackgen\api\feedback_generator();
             $feedback  = $generator->run($problems, $ragresults);
 
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                => $jobid,
                 'status'            => 'feedback_pending',
                 'feedback_result'   => json_encode($feedback, JSON_UNESCAPED_UNICODE),
@@ -210,7 +231,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             mtrace("[qbank_stackgen] Job {$jobid}: feedback draft generated, awaiting teacher review.");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'status'       => 'requires_manual_review',
                 'error_msg'    => 'Stage3 feedback error: ' . $e->getMessage(),
@@ -228,16 +249,26 @@ class generate_stack_question extends \core\task\adhoc_task {
      * @return array $problems と同じ順序の配列。各要素は rag_search::search() の結果（空配列もありうる）。
      */
     private function run_rag_search(int $jobid, array $problems): array {
+        global $DB;
+
         if (empty(get_config('qbank_stackgen', 'rag_enabled'))) {
             return array_fill(0, count($problems), []);
         }
 
         $topk = max(1, (int)(get_config('qbank_stackgen', 'rag_topk') ?: 3));
+        // アンケート用のleave-one-out生成: ジョブごとに指定された sourcefile を検索対象から外す。
+        $exclude = json_decode((string)$DB->get_field('qbank_stackgen_jobs', 'rag_exclude', ['id' => $jobid]), true);
+        $exclude = is_array($exclude) ? $exclude : [];
         $results = [];
         foreach ($problems as $i => $problem) {
             try {
                 $querytext = $problem['stack_question_text'] ?? ($problem['question_text'] ?? '');
-                $results[$i] = $querytext !== '' ? \qbank_stackgen\local\rag_search::search($querytext, $topk) : [];
+                if ($querytext !== '') {
+                    // 問題文だけでは式が含まれず類似度が潰れるため、式(LaTeX→Maxima風に変換)も検索対象にする。
+                    $querytext = \qbank_stackgen\local\rag_text::build($querytext,
+                        \qbank_stackgen\local\rag_text::latex_to_maxima((string)($problem['problem_expression'] ?? '')));
+                }
+                $results[$i] = $querytext !== '' ? \qbank_stackgen\local\rag_search::search($querytext, $topk, $exclude) : [];
             } catch (\Throwable $e) {
                 mtrace("[qbank_stackgen] Job {$jobid}: RAG search failed for problem #" . ($i + 1)
                     . ", continuing without it: " . $e->getMessage());
@@ -267,7 +298,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 $generator = new \qbank_stackgen\api\llm_generator();
                 $output    = $generator->run($problems, $feedbackproblems, $lasterror, $ragresults);
             } catch (\Throwable $e) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'requires_manual_review',
                     'error_msg'    => 'Stage4 LLM error: ' . $e->getMessage(),
@@ -282,7 +313,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             } catch (\Throwable $e) {
                 // goemaximaとの通信エラーはコンテンツの問題ではないインフラ障害なので、
                 // 再生成リトライはせず即座に手動レビューへ回す。
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'requires_manual_review',
                     'xml_result'   => $output['xml'],
@@ -295,7 +326,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             }
 
             if ($result['valid']) {
-                $DB->update_record('qbank_stackgen_jobs', (object)[
+                \qbank_stackgen\local\event_log::update_job((object)[
                     'id'           => $jobid,
                     'status'       => 'validated',
                     'xml_result'   => $output['xml'],
@@ -311,7 +342,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             }
 
             $lasterror = implode(' / ', $result['errors']);
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'status'       => 'validation_failed',
                 'xml_result'   => $output['xml'],
@@ -324,7 +355,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 . $lasterror);
         }
 
-        $DB->update_record('qbank_stackgen_jobs', (object)[
+        \qbank_stackgen\local\event_log::update_job((object)[
             'id'           => $jobid,
             'status'       => 'requires_manual_review',
             'error_msg'    => "Stage5 CAS validation failed after {$maxretry} attempts: {$lasterror}",
@@ -347,7 +378,7 @@ class generate_stack_question extends \core\task\adhoc_task {
             // 承認済み（問題バンク登録完了）になったので、一時保存していた元画像は不要になる。
             // CLAUDE.md記載の方針「image_b64はDBに一時保存のみ。承認/却下後に削除する」に従い、
             // ここで確実に削除する（xml_result等の生成結果は評価データとして残す）。
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'                    => $jobid,
                 'status'                => 'approved',
                 'question_ids'          => json_encode($result['questionids']),
@@ -360,7 +391,7 @@ class generate_stack_question extends \core\task\adhoc_task {
                 . count($result['questionids']) . " question(s)).");
 
         } catch (\Throwable $e) {
-            $DB->update_record('qbank_stackgen_jobs', (object)[
+            \qbank_stackgen\local\event_log::update_job((object)[
                 'id'           => $jobid,
                 'status'       => 'requires_manual_review',
                 'error_msg'    => 'Stage6 import error: ' . $e->getMessage(),

@@ -141,6 +141,8 @@ foreach ($files as $path) {
         'timemodified'   => $now,
     ]);
 
+    \qbank_stackgen\local\event_log::log((int)$jobid, '', 'created', $filename);
+
     $task = new \qbank_stackgen\task\generate_stack_question();
     $task->set_custom_data(['jobid' => $jobid]);
     \core\task\manager::queue_adhoc_task($task, true);
